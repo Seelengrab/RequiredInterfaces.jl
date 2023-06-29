@@ -1,4 +1,8 @@
-using Revise
+liveserver = "liveserver" in ARGS
+if liveserver
+    using Revise
+    Revise.revise()
+end
 
 using Documenter 
 using RequiredInterfaces
@@ -8,15 +12,17 @@ DocMeta.setdocmeta!(RequiredInterfaces, :DocTestSetup, :(using RequiredInterface
 function builddocs(clear=false)
     clear && rm(joinpath(@__DIR__, "build"), force=true, recursive=true)
     makedocs(
-        sitename="RequiredInterfaces.jl Documentation",
+        sitename="RequiredInterfaces.jl",
         format = Documenter.HTML(
             prettyurls = get(ENV, "CI", nothing) == true
         ),
         pages = [
             "Main Page" => "index.md",
             "Examples" => [
-                "Basic Example" =>  "examples/basic.md"
-            ]
+                "examples/basic.md",
+                "examples/testing.md"
+            ],
+            "About Interfaces" => "interfaces.md",
             "API Reference" => "api.md"
         ]
     )
@@ -24,7 +30,7 @@ end
 
 builddocs()
 
-!isinteractive() && deploydocs(
+!isinteractive() && !liveserver && deploydocs(
    repo = "github.com/Seelengrab/RequiredInterfaces.jl.git",
    devbranch = "main",
    push_preview = true

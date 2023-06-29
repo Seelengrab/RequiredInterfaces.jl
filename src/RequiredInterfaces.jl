@@ -2,32 +2,40 @@ module RequiredInterfaces
 
 using Test, InteractiveUtils
 
-export @interface
+export @required, NotImplementedError
 
 """
     isInterface(::Type{T}) -> Bool
 
-Return whether the given (abstract) type is an recognized interface.
+Return whether the given (abstract) type is a recognized interface.
+
+Throws an `ArgumentError` if the given type is not a registered interface.
 """
 isInterface(_) = false
 
 """
-    getInterfaceFuncs(::Type{T}) -> Vector{Tuple{F, Tuple}}
+    getInterfaceFuncs(::Type{T}) -> Vector{Tuple{F, NTuple{N, <:Type}}}
 
-Return the 
+Return the list of functions and their signatures that are considered required for the given interface `T`.
+
+Throws an `ArgumentError` if the given type is not a registered interface.
 """
 function getInterfaceFuncs end
 
 """
-    @interface Interface func(::Foo, ::Interface)
+    @required Interface func(::Foo, ::Interface)
+    @required Interface function func(::Foo, ::Interface) end
 
 Marks all occurences of `Interface` in the given function signature as part of the interface `Interface`.
 Also defines a fallback method which throws a [`NotImplementedError`](@ref) when called with an argument that
 doesn't implement this mandatory function.
 
-`Interface` is expected to be an abstract type.
+Throws an `ArgumentError` if `Interface` is not an abstract type or the given expression doesn't conform to the
+two shown styles. The function body of the second style is expected to be empty - `@required` can't be used to
+mark fallback implementations as part of a user-implementable interface. Its sole purpose is marking
+parts of an API that a user needs to implement to be able to have functions expecting that interface work.
 """
-macro interface(T::Symbol, expr::Expr)
+macro required(T::Symbol, expr::Expr)
     if expr.head === :function 
         funcsig = expr.args[1]
     elseif expr.head === :call
@@ -89,7 +97,8 @@ The message displayed by this Exception refers to `T` directly, so there's no ne
 subtype here.
 
 Compared to `MethodError`, a `NotImplementedError` communicates "there should be a method to call here,
-but it needs to be implemented by the developer making use of the interface".
+but it needs to be implemented by the developer making use of the interface". This is mostly used through
+the [`@required`](@ref) macro, which handles the message generation for you.
 
 ## Examples
 
@@ -101,13 +110,20 @@ julia> bar(::Foo, ::Int) = throw(NotImplementedError("Foo", "bar(::T, ::Int)"))
 julia> struct Baz <: Foo end
 
 julia> bar(Baz(), 1)
-ERROR: NotImplementedError: The called method is part of a fallback definition for the `Foo` Interface.
-Please implement `bar(::T, ::Int)` for your type T.
+ERROR: NotImplementedError: The called method is part of a fallback definition for the `Foo` interface.
+Please implement `bar(::T, ::Int)` for your type `T <: Foo`.
 Stacktrace:
  [1] bar(::Baz, ::Int64)
    @ Main ./REPL[4]:1
  [2] top-level scope
    @ REPL[8]:1
+
+# note how `MethodError` indicates that this isn't intended to be called
+julia> bar(1, Baz())
+ERROR: MethodError: no method matching bar(::Int64, ::Baz)
+Stacktrace:
+ [1] top-level scope
+   @ REPL[6]:1
 ```
 """
 struct NotImplementedError <: Exception
@@ -117,8 +133,8 @@ end
 
 function Base.showerror(io::IO, nie::NotImplementedError)
     printstyled(io, "NotImplementedError: "; color=:red)
-    print(io, "The called method is part of a fallback definition for the `", nie.interface, "` Interface.\n",
-              "Please implement `", nie.func, "` for your type T <: `", nie.interface, "`.")
+    print(io, "The called method is part of a fallback definition for the `", nie.interface, "` interface.\n",
+              "Please implement `", nie.func, "` for your type `T <: ", nie.interface, "`.")
 end
 
 function concrete_subtypes(T=Any)::Vector{DataType}
@@ -140,9 +156,9 @@ end
 
 throwNotAnInterface(interface) = throw(ArgumentError("`$interface` is not a registered interface."))
 
-function check_all_implementations(interface::Type)
+function check_implementations(interface::Type, types=concrete_subtypes(interface))
     isInterface(interface) || throwNotAnInterface(interface)
-    @testset "Interface Check: $implementor" for implementor in concrete_subtypes(interface)
+    @testset "Interface Check: $implementor" for implementor in types
         @testset let interface = interface, implementor = implementor
             @test check_interface_implemented(interface, implementor)
         end
