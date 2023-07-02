@@ -30,9 +30,9 @@ These five objects are our main point of interest. There are also some special t
 `DataType`, but those are (for the most part) internal implementation details for giving some type
 to the type objects above, or are dispatch hacks and not relevant for this discussion.
 
-In general, these types are arranged in a lattice, formed by comparison with `<:`, the subtype relation.
+In general, these types are arranged in a [lattice](https://en.wikipedia.org/wiki/Lattice_(order)), formed by ordering according to `<:`, the subtype relation.
 
-This lattice has the following properties:
+This lattice has the following properties. The first five properties follow directly from being a lattice; the sixth is a result of our type system.
 
  * For all types `T`, `T <: Any` is `true`.
     * More informally, `Any` is the topmost type in the lattice (thus also called Top).
@@ -42,8 +42,10 @@ This lattice has the following properties:
     * More informally, `Union{}` is the bottommost type in the lattice (thus also called Bottom).
  * For no types `T` other than `T === Union{}` does `T <: Union{}` hold.
     * More informally, the only subtype of `Union{}` is `Union{}`.
- * For all types `T`, if `isconcretetype(T)` is `true`, then the only type `S` for which `S <: T` is `true` is `S == Unin{}`.
-    * This is the requirement that concrete types cannot be subtyped; they are direct supertypes of `Union{}`, though `supertypes(Union{})` doesn't show us that (the set is not enumerable, because it grows with new struct & type definitions and `UnionAll`s make a mess of things through virtue of being infinitely large).
+ * For all types `T`, `T <: T` is `true`.
+    * All types are their own subtype.
+ * For all types `T`, if `isconcretetype(T)` is `true`, then the only types `S` for which `S <: T` is `true` are `S === Union{}` and `S === T`.
+    * This is the requirement that concrete types cannot be subtyped; they are (almost) direct supertypes of `Union{}`, though `supertypes(Union{})` can't show us that (the set is not enumerable, because it grows with new struct & type definitions and `UnionAll`s make a mess of things through virtue of being infinitely large).
     * Note that if `!isconcretetype(T)`, this property has no effect - we can add a new abstract type below an existing abstract type, effectively inserting it inbetween `Union{} <: T` like `Union{} <: S <: T`.
 
 There are some other properties the type lattice has, but these are the ones relevant for this discussion,
@@ -114,8 +116,9 @@ Union{} <: Concrete <: Bar <: Foo <: Any
 ```
 
 We can truly say that objects of type `Concrete` ought to be possible to pass into `myFunc`, and  similarly any function
-that has an argument that's either not restricted in its type, or is explicitly typed `Any`. Said differently,
-any function which has arguments that are typed `Any` must not throw an error upon trying to call it with any object.+
+that has an argument that's either unrestricted in its type or is explicitly typed `Any`. Said differently,
+any function which has arguments that are typed `Any` must not throw an error upon trying to call it with any object (though
+whether that call returns some form of a successful result is a different matter).
 
 There are some implications with nesting function calls. For example, if we have a function `myAdd`:
 
@@ -161,7 +164,7 @@ subtyping `Addable` is a statement of conformity to the requirements that `Addab
 that our type can give at least the same, if not stronger guarantees, as other types who subtype `Addable`
 can and/or need to be able to give.
 
-Unfortunately, this kind of dependency is currently implicit in julia. This is what [`@required`](@ref) allows a library
+Unfortunately, this kind of dependency is currently implicit in Julia. This is what [`@required`](@ref) allows a library
 to change - by making the expected interface explicit, implementors can _check_ that they conform to the implicit
 interface that `Addable` or any other abstract type at minimum requires.
 
@@ -274,7 +277,7 @@ _myInterfaceFunc(::IsNotTrait, x) = "I don't implement the trait: $(typeof(x))"
 
 That is, leave the supertype declaration of `Foo` untyped, define an overload for the trait function `isMyTrait(::Foo)`
 to say we support the trait, and finally call that trait function in our entry function to dispatch later on to
-whether the argument supports the trait or not, and we're now free to have subtype `Foo` subtype something else entirely.
+whether the argument supports the trait or not, and we're now free to have `Foo` subtype something else entirely.
 
 So instead of 
 
@@ -419,6 +422,11 @@ create a `Meet`-like of the supported traits, but that then exposes the true pro
 which implementation of `_myInterfaceFunc` we'd like to use, if both exist. The only way out is yet again defining
 `_myInterfaceFunc(::Foo)`, breaking the ambiguity.
 
+In contrast, since both `MyTrait` and `AnotherTrait` share this trait function as part of their interface, `Foo` ought to have already been aware
+of the  ambiguity, and implemented to specialized version `myInterfaceFunc(::Foo)` itself directly (or fallen back to `myInterfaceFunc(::Meet{MyTrait, AnotherTrait})`,
+should that be available). The aambiguity needs to be broken some way or another, either by the `Foo` type for itself (it can't define the `Meet` version without piracy)
+or by either `MyTrait` or `AnotherTrait` via a package extension (ideally in coordinate, as otherwise you may get conflicting definitions overwriting each other).
+
 All of this will need to be discussed & thought through thoroughly though - there is no silver bullet.
 
 ## Relation to API stability
@@ -447,18 +455,20 @@ desired, at least the following must hold true:
       required method.
     * I.e., you can't "shrink" an interface. If such a change is desired, the options are either
         * to deprecate the functionality in a non-breaking change (being careful to keep existing code working!), and remove it in the next breaking change
-        * to add a new, distinct type providing the smaller interface and deprecating the old interface entirely
+          * This is easily coupled with moving a method to a subtype of the existing interface, directing users to subtype the subtype instead
+            or by adding a direct supertype which has the weaker semantics (preferable, as that keeps user code the same).
+        * or to add a new, distinct type providing the smaller interface and deprecating the old interface entirely
 
 There are certainly more details regarding interface stability between versions - this list is not exhaustive.
 An attempt at that exhaustiveness specific to Julia was recorded [here](https://github.com/JuliaLang/julia/issues/49973),
 though there certainly is room for improvement and a more thorough calculus on what is permitted in terms of
 a change in API. There is also the possibility of incorporating existing literature into this (most I could find
 was in regards to empirical studies of API stability in Java, but even those results are bound to be useful). There
-is also some existing work from the rust community aabout this.
+is also some existing work from the rust community aabout this - see the references list down below.
 
 Finally, the large body of work on preconditions, postconditions & invariants is also related to this topic.
 
-## References
+## Appendix
 
 A large part of this discussion is inspired by looking at how other languages design their type system,
 but especially poignant (and what ultimately sparked my attempt here to equate abstract types with interfaces)
@@ -476,8 +486,10 @@ Admittedly, there are edge cases with `Meet`, in particular with
 how `Meet` and `Union` interact in dispatch, that I have not yet had the time to fully describe here. I do hope that
 their interactions fall cleanly out of the lattice geometry, though I haven't checked yet.
 
-Some of the alluded-to research/projects about API stability includes, but is not limited to:
+## References
 
+ * [Tim Holy invents Holy traits](https://github.com/JuliaLang/julia/issues/2345#issuecomment-54537633)
+ * [Abstract types have existential type](https://dl.acm.org/doi/10.1145/44501.45065)
  * [Measuring software library stability through historical version analysis](https://ieeexplore.ieee.org/abstract/document/6405296)
  * [APIDiff: Detecting API breaking changes](https://ieeexplore.ieee.org/abstract/document/8330249)
  * [cargo-semver-checks](https://github.com/obi1kenobi/cargo-semver-checks)
