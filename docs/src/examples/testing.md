@@ -41,11 +41,12 @@ report which signature was missed, and for which function.
 If there are a lot of types implementing a specific interface, it's also possible to test all types
 who claim to implement the interface, or only a subset of them, instead of doing that on per-type basis:
 
-!!! warning "Documenter Bug"
+!!! warning "Julia Bug"
     The first testset below should in reality produce an error, due to not all subtypes of `MyInterface` actually
-    implementing the interface. However, due to a bug in Documenter.jl ([see this issue](https://github.com/JuliaDocs/Documenter.jl/issues/2160)), `MyInterface` claims
+    implementing the interface. However, due to a bug in Julia ([see this issue](https://github.com/JuliaLang/julia/issues/50354)), `MyInterface` claims
     to not have any subtypes, in spite of the fact that the subtypes have `MyInterface` as their supertype, leading to an empty
-    testset. As a workaround, there is a second testset using the explicit collection version to check the subtypes manually.
+    testset. As a workaround, there is a second testset using the explicit collection version to check the subtypes manually, to show the expected failure.
+    This bug in Julia should not impact the functionality of this package.
 
 ```@repl testing
 struct AnotherImplementor <: MyInterface end

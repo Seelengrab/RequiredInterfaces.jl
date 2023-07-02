@@ -421,6 +421,43 @@ which implementation of `_myInterfaceFunc` we'd like to use, if both exist. The 
 
 All of this will need to be discussed & thought through thoroughly though - there is no silver bullet.
 
+## Relation to API stability
+
+A related topic to "Abstract types are (implicit) interfaces" is how this interpretation relates to
+version changes under Semver. If an abstract type declares an (implicit) interface, it follows that
+changing that interface in a version bump requires considerations regarding stability, in order to
+not create a breaking change where none was intended. Specifically, if a non-breaking change is
+desired, at least the following must hold true:
+
+ * A method that **wasn't** required to be implemented for subtypes must not become required to be implemented.
+    * This is because adding a method to the required surface of the interface breaks existing implementations, by causing them
+      to no longer be compliant with the interface.
+    * I.e., you can't "grow" an interface. If such an extension is desired, it is better to
+      have a new abstract type subtyping the existing abstract type, with the additional requirements added to that subtype.
+ * A method that previously had certain requirements **must not** demand stronger requirements.
+    * This again is because existing implementations may not be able to provide those stronger requirements.
+    * An exception can be made if the newer, stronger requirements follow directly from the existing, weaker requirements; i.e.
+      the "stronger" requirements were already there to begin with, but either undocumented or follow from deduction of the existing requirements.
+ * A method previously giving some set of guarantees **can** weaken those guarantees.
+    * This is because existing implementations, who provide the older, stronger guarantees, will still be compliant with
+      the interface.
+ * A method that was previously required in an interface, **can not** be made no longer required.
+    * This is because code written with the old API surface and its assumptions of what names exist
+      can break if it encounters a type working with the new surface, which may not implement a previously
+      required method.
+    * I.e., you can't "shrink" an interface. If such a change is desired, the options are either
+        * to deprecate the functionality in a non-breaking change (being careful to keep existing code working!), and remove it in the next breaking change
+        * to add a new, distinct type providing the smaller interface and deprecating the old interface entirely
+
+There are certainly more details regarding interface stability between versions - this list is not exhaustive.
+An attempt at that exhaustiveness specific to Julia was recorded [here](https://github.com/JuliaLang/julia/issues/49973),
+though there certainly is room for improvement and a more thorough calculus on what is permitted in terms of
+a change in API. There is also the possibility of incorporating existing literature into this (most I could find
+was in regards to empirical studies of API stability in Java, but even those results are bound to be useful). There
+is also some existing work from the rust community aabout this.
+
+Finally, the large body of work on preconditions, postconditions & invariants is also related to this topic.
+
 ## References
 
 A large part of this discussion is inspired by looking at how other languages design their type system,
@@ -438,3 +475,10 @@ by the functions they are passed to.
 Admittedly, there are edge cases with `Meet`, in particular with
 how `Meet` and `Union` interact in dispatch, that I have not yet had the time to fully describe here. I do hope that
 their interactions fall cleanly out of the lattice geometry, though I haven't checked yet.
+
+Some of the alluded-to research/projects about API stability includes, but is not limited to:
+
+ * [Measuring software library stability through historical version analysis](https://ieeexplore.ieee.org/abstract/document/6405296)
+ * [APIDiff: Detecting API breaking changes](https://ieeexplore.ieee.org/abstract/document/8330249)
+ * [cargo-semver-checks](https://github.com/obi1kenobi/cargo-semver-checks)
+ * [cargo-public-api](https://github.com/Enselic/cargo-public-api)
