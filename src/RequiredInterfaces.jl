@@ -14,23 +14,23 @@ Throws an `ArgumentError` if the given type is not a registered interface.
 isInterface(_) = false
 
 """
-    getInterfaceFuncs(::Type{T}) -> Vector{Tuple{F, NTuple{N, <:Type}}}
+    getInterface(::Type{T}) -> Interface
 
-Return the list of functions and their signatures that are considered required for the given interface `T`.
+Return the [`Interface`](@ref) described by  the type `T`.
 
 Throws an `ArgumentError` if the given type is not a registered interface.
 """
-function getInterfaceFuncs end
+function getInterface end
 
 """
-    @required Interface func(::Foo, ::Interface)
-    @required Interface function func(::Foo, ::Interface) end
+    @required MyInterface func(::Foo, ::MyInterface)
+    @required MyInterface function func(::Foo, ::MyInterface) end
 
-Marks all occurences of `Interface` in the given function signature as part of the interface `Interface`.
+Marks all occurences of `MyInterface` in the given function signature as part of the interface `MyInterface`.
 Also defines a fallback method which throws a [`NotImplementedError`](@ref) when called with an argument that
 doesn't implement this mandatory function.
 
-Throws an `ArgumentError` if `Interface` is not an abstract type or the given expression doesn't conform to the
+Throws an `ArgumentError` if `MyInterface` is not an abstract type or the given expression doesn't conform to the
 two shown styles. The function body of the second style is expected to be empty - `@required` can't be used to
 mark fallback implementations as part of a user-implementable interface. Its sole purpose is marking
 parts of an API that a user needs to implement to be able to have functions expecting that interface work.
@@ -57,10 +57,11 @@ macro required(T::Symbol, expr::Expr)
 
     funcdefs = quote
         RequiredInterfaces.isInterface(::Type{$escT}) = true
-        function RequiredInterfaces.getInterfaceFuncs(::Type{$escT})
+        function RequiredInterfaces.getInterface(::Type{$escT})
             isInterface($escT) || throwNotAnInterface($escT)
             if !haskey(getInterfaceDict(), $escT)
-                arr = getInterfaceDict()[$escT] = Tuple{Any, Tuple}[]
+                arr = Tuple{Any, Tuple}[]
+                getInterfaceDict()[$escT] = Interface($escT, arr)
                 push!(arr, ($escFunc, $res))
             else
                 getInterfaceDict()[$escT]
@@ -73,7 +74,6 @@ macro required(T::Symbol, expr::Expr)
         $funcdefs;
         $escFunc
     )
-    # @info "macro expanded"  retcode
     return retcode
 end
 
@@ -83,7 +83,44 @@ function error_msg(f, sig)
     msg * ")"
 end
 
-const INTERFACES = Dict{Type, Vector{Tuple{Any, Tuple}}}()
+"""
+    Interface
+
+A struct describing the notion of an (abstract-)type-based interface.
+"""
+struct Interface
+    type::Type
+    meths::Vector{Tuple{Any,Tuple}}
+end
+
+"""
+    functions(i::Interface)
+
+Returns the functions that are required by this interface.
+"""
+function functions(i::Interface)
+    unique!(map(methods(i)) do (f,_)
+        f
+    end)
+end
+
+"""
+    methods(i::Interface)
+
+Return the methods (i.e., functions and their signatures) required to be implemented by this interface.
+
+See also [`functions`](@ref).
+"""
+methods(i::Interface) = i.meths
+
+"""
+    interfaceType(i::Interface)
+
+Return the (abstract) type associated with this interface.
+"""
+interfaceType(i::Interface) = i.type
+
+const INTERFACES = Dict{Type, Interface}()
 getInterfaceDict() = INTERFACES
 
 """
@@ -168,7 +205,7 @@ end
 function check_interface_implemented(interface::Type, implementor::Type)
     isInterface(interface) || throwNotAnInterface(interface)
     isconcretetype(implementor) || throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
-    sigs = getInterfaceFuncs(interface)
+    sigs = methods(getInterface(interface))
     failures = []
     for sig in sigs
         func, interfacetypes = sig
