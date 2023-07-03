@@ -142,7 +142,11 @@ the [`@required`](@ref) macro, which handles the message generation for you.
 
 ## Examples
 
-```jldoctest
+Note how `MethodError` in the example below indicates that the method isn't intended to be called.
+
+```jldoctest; filter = r"#unused#"
+julia> using RequiredInterfaces: NotImplementedError
+
 julia> abstract type Foo end
 
 julia> bar(::Foo, ::Int) = throw(NotImplementedError("Foo", "bar(::T, ::Int)"))
@@ -154,12 +158,11 @@ julia> bar(Baz(), 1)
 ERROR: NotImplementedError: The called method is part of a fallback definition for the `Foo` interface.
 Please implement `bar(::T, ::Int)` for your type `T <: Foo`.
 Stacktrace:
- [1] bar(::Baz, ::Int64)
+ [1] bar(#unused#::Baz, #unused#::Int64)
    @ Main ./none:1
  [2] top-level scope
    @ none:1
 
-# note how `MethodError` indicates that this isn't intended to be called
 julia> bar(1, Baz())
 ERROR: MethodError: no method matching bar(::Int64, ::Baz)
 Stacktrace:
