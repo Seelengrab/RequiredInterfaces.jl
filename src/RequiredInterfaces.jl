@@ -61,8 +61,8 @@ macro required(T::Symbol, expr::Expr)
             isInterface($escT) || throwNotAnInterface($escT)
             if !haskey(getInterfaceDict(), $escT)
                 arr = Tuple{Any, Tuple}[]
-                getInterfaceDict()[$escT] = Interface($escT, arr)
                 push!(arr, ($escFunc, $res))
+                getInterfaceDict()[$escT] = Interface($escT, arr)
             else
                 getInterfaceDict()[$escT]
             end
@@ -92,6 +92,9 @@ struct Interface
     type::Type
     meths::Vector{Tuple{Any,Tuple}}
 end
+
+Base.:(==)(a::Interface, b::Interface) = a.type == b.type && all(splat(==), zip(a.meths, b.meths))
+Base.hash(a::Interface, u::UInt) = hash(a.type, foldr(hash, a.meths; init=u))
 
 """
     functions(i::Interface)
@@ -206,7 +209,7 @@ function check_interface_implemented(interface::Type, implementor::Type)
     isInterface(interface) || throwNotAnInterface(interface)
     isconcretetype(implementor) || throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
     sigs = methods(getInterface(interface))
-    failures = []
+    failures = Tuple{Any,Tuple}[]
     for sig in sigs
         func, interfacetypes = sig
         argtypes = ntuple(length(interfacetypes)) do i
@@ -221,7 +224,9 @@ function check_interface_implemented(interface::Type, implementor::Type)
         errorExpr.head === :call || continue
         isempty(errorExpr.args) && continue # weird Expr?
         gr =  errorExpr.args[1]
-        gr isa GlobalRef && gr.binding.value === NotImplementedError && push!(failures, sig) # found one! 
+        if gr isa GlobalRef && gr.binding.value === NotImplementedError
+            push!(failures, (func, argtypes)) # found one!
+        end
     end
 
     return isempty(failures) || return failures
