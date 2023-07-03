@@ -181,17 +181,17 @@ function Base.showerror(io::IO, nie::NotImplementedError)
               "Please implement `", nie.func, "` for your type `T <: ", nie.interface, "`.")
 end
 
-function concrete_subtypes(T=Any)::Vector{DataType}
+function nonabstract_subtypes(T=Any)::Vector{DataType}
     isabstracttype(T) || throw(ArgumentError("Only abstract types are supported! Got unsupported type: `$T`"))
     subs = subtypes(T)
-    ret = filter(isconcretetype, subs)
+    ret = filter(!isabstracttype, subs)
     filter!(isabstracttype, subs)
 
     while !isempty(subs)
         ntype = popfirst!(subs)
         ntype == Any && continue
         nsubs = subtypes(ntype)
-        append!(ret, Iterators.filter(isconcretetype, nsubs))
+        append!(ret, Iterators.filter(!isabstracttype, nsubs))
         append!(subs, Iterators.filter(isabstracttype, nsubs))
     end
 
@@ -200,7 +200,7 @@ end
 
 throwNotAnInterface(interface) = throw(ArgumentError("`$interface` is not a registered interface."))
 
-function check_implementations(interface::Type, types=concrete_subtypes(interface))
+function check_implementations(interface::Type, types=nonabstract_subtypes(interface))
     isInterface(interface) || throwNotAnInterface(interface)
     @testset "Interface Check: $implementor" for implementor in types
         @testset let args=(interface = interface, implementor = implementor)
@@ -213,7 +213,7 @@ valid_globalref(gr) = gr.mod === RequiredInterfaces && gr.name === :NotImplement
 
 function check_interface_implemented(interface::Type, implementor::Type)
     isInterface(interface) || throwNotAnInterface(interface)
-    isconcretetype(implementor) || throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
+    isabstracttype(implementor) && throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
     sigs = methods(getInterface(interface))
     failures = Tuple{Any,Tuple}[]
     for sig in sigs
