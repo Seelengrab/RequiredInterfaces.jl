@@ -205,6 +205,8 @@ function check_implementations(interface::Type, types=concrete_subtypes(interfac
     end
 end
 
+valid_globalref(gr) = gr.mod === RequiredInterfaces && gr.name === :NotImplementedError
+
 function check_interface_implemented(interface::Type, implementor::Type)
     isInterface(interface) || throwNotAnInterface(interface)
     isconcretetype(implementor) || throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
@@ -224,7 +226,7 @@ function check_interface_implemented(interface::Type, implementor::Type)
         errorExpr.head === :call || continue
         isempty(errorExpr.args) && continue # weird Expr?
         gr =  errorExpr.args[1]
-        if gr isa GlobalRef && gr.binding.value === NotImplementedError
+        if gr isa GlobalRef && valid_globalref(gr)
             push!(failures, (func, argtypes)) # found one!
         end
     end
