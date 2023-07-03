@@ -146,6 +146,7 @@ the [`@required`](@ref) macro, which handles the message generation for you.
 julia> abstract type Foo end
 
 julia> bar(::Foo, ::Int) = throw(NotImplementedError("Foo", "bar(::T, ::Int)"))
+bar (generic function with 1 method)
 
 julia> struct Baz <: Foo end
 
@@ -154,16 +155,16 @@ ERROR: NotImplementedError: The called method is part of a fallback definition f
 Please implement `bar(::T, ::Int)` for your type `T <: Foo`.
 Stacktrace:
  [1] bar(::Baz, ::Int64)
-   @ Main ./REPL[4]:1
+   @ Main ./none:1
  [2] top-level scope
-   @ REPL[8]:1
+   @ none:1
 
 # note how `MethodError` indicates that this isn't intended to be called
 julia> bar(1, Baz())
 ERROR: MethodError: no method matching bar(::Int64, ::Baz)
 Stacktrace:
  [1] top-level scope
-   @ REPL[6]:1
+   @ none:1
 ```
 """
 struct NotImplementedError <: Exception
