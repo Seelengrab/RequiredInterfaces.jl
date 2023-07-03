@@ -199,7 +199,7 @@ throwNotAnInterface(interface) = throw(ArgumentError("`$interface` is not a regi
 function check_implementations(interface::Type, types=concrete_subtypes(interface))
     isInterface(interface) || throwNotAnInterface(interface)
     @testset "Interface Check: $implementor" for implementor in types
-        @testset let interface = interface, implementor = implementor
+        @testset let args=(interface = interface, implementor = implementor)
             @test check_interface_implemented(interface, implementor)
         end
     end
