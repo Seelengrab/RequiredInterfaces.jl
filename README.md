@@ -9,3 +9,5 @@ RequiredInterfaces.jl is a small package, allowing abstract-type based definitio
 some methods for checking whether a type that claims to implement an interface, actually implements the required methods.
 
 Please check out the [documentation](https://seelengrab.github.io/RequiredInterfaces.jl/) to learn how you can use RequiredInterfaces.jl to provide basic "implement me" style interfaces in your library.
+
+If you want to learn more about the motivation & philosophy behind this package, check out [this writeup](https://seelengrab.github.io/RequiredInterfaces.jl/dev/interfaces.html) about APIs and their surface in Julia, which is part of the documentation of this package.
