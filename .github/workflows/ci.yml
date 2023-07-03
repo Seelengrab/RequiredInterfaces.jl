@@ -70,7 +70,7 @@ jobs:
           julia --project=docs -e '
             using Documenter: doctest
             using Documenter.DocMeta: setdocmeta!
-            using PropCheck
+            using RequiredInterfaces
             setdocmeta!(RequiredInterfaces, :DocTestSetup, :(using RequiredInterfaces); recursive=true)
             doctest(RequiredInterfaces)'
       - run: julia --project=docs docs/make.jl
