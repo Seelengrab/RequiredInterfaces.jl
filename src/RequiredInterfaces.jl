@@ -1,6 +1,6 @@
 module RequiredInterfaces
 
-using Test, InteractiveUtils
+using Test, InteractiveUtils, Logging
 
 export @required, NotImplementedError
 
@@ -181,7 +181,7 @@ function Base.showerror(io::IO, nie::NotImplementedError)
               "Please implement `", nie.func, "` for your type `T <: ", nie.interface, "`.")
 end
 
-function nonabstract_subtypes(T=Any)::Vector{DataType}
+function nonabstract_subtypes(T=Any)
     isabstracttype(T) || throw(ArgumentError("Only abstract types are supported! Got unsupported type: `$T`"))
     subs = subtypes(T)
     ret = filter(!isabstracttype, subs)
@@ -202,10 +202,12 @@ throwNotAnInterface(interface) = throw(ArgumentError("`$interface` is not a regi
 
 function check_implementations(interface::Type, types=nonabstract_subtypes(interface))
     isInterface(interface) || throwNotAnInterface(interface)
-    @testset "Interface Check: $implementor" for implementor in types
+    @testset "Interface Check: $interface" begin
+    @testset "$implementor" for implementor in types
         @testset let args=(interface = interface, implementor = implementor)
             @test check_interface_implemented(interface, implementor)
         end
+    end
     end
 end
 
@@ -221,6 +223,21 @@ function check_interface_implemented(interface::Type, implementor::Type)
         argtypes = ntuple(length(interfacetypes)) do i
             itype = interfacetypes[i]
             itype === interface ? implementor : itype
+        end
+        matches = Base.methods(func, argtypes)
+        if length(matches) != 1
+            found = map(matches) do m
+                typs = if m.sig isa DataType
+                    m.sig.types
+                elseif m.sig isa UnionAll
+                    m.sig.body.types
+                end
+                (typs[2:end]...,)
+            end
+            filter!(!=(interfacetypes), found)
+            @warn "Not all signatures required matching $func$argtypes are implemented." Found=found
+            push!(failures, (func, argtypes))
+            continue
         end
         ct, rettype = only(code_typed(func, argtypes))
         rettype !== Union{} && continue # if it infers, we can't throw our error
