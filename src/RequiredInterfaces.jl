@@ -36,12 +36,12 @@ mark fallback implementations as part of a user-implementable interface. Its sol
 parts of an API that a user needs to implement to be able to have functions expecting that interface work.
 """
 macro required(T::Symbol, expr::Expr)
-    if expr.head === :function 
+    if expr.head === :function
         funcsig = expr.args[1]
     elseif expr.head === :call
         funcsig = expr
         expr = Expr(:function, expr, :())
-    else 
+    else
         throw(ArgumentError("Given expression is not a valid interface definition!"))
     end
     sig = Symbol[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
@@ -78,7 +78,7 @@ macro required(T::Symbol, expr::Expr)
 end
 
 function error_msg(f, sig)
-    msg = "$f(::" 
+    msg = "$f(::"
     msg *= join(sig, ", ::")
     msg * ")"
 end
@@ -204,9 +204,7 @@ function check_implementations(interface::Type, types=nonabstract_subtypes(inter
     isInterface(interface) || throwNotAnInterface(interface)
     @testset "Interface Check: $interface" begin
     @testset "$implementor" for implementor in types
-        @testset let args=(interface = interface, implementor = implementor)
-            @test check_interface_implemented(interface, implementor)
-        end
+        @test check_interface_implemented(interface, implementor)
     end
     end
 end
