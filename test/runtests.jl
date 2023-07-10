@@ -24,16 +24,33 @@ struct SubParametricImpl{T} <: TestSubParametric{T} end
 # only the additional interface needs to be implemented
 subparamfunc(::SubParametricImpl{T}) where T = T
 
+abstract type TestMultiFunc end
+@required TestMultiFunc begin
+    multifunc1(::TestMultiFunc)
+    multifunc2(::TestMultiFunc)
+end
+
+struct SubMultiFuncImpl <: TestMultiFunc end
+multifunc1(::SubMultiFuncImpl) = 1
+multifunc2(::SubMultiFuncImpl) = 2
+
+module DRMod
+    using RequiredInterfaces
+    abstract type DoubleRequired end
+    @required DoubleRequired drfunc1(::DoubleRequired)
+end
+
 @testset "All tests" begin
     @testset "Correct implementation" begin
-        @testset "$s" for (s, interface, impl, func, interface_sig) in
-                (("Basic", TestInterface, TestImpl, testfunc, (Int, TestInterface)),
-                 ("Parametric", TestParametric, ParametricImpl, paramfunc, (TestParametric,)),
-                 ("SubParametric", TestParametric, SubParametricImpl, paramfunc, (TestParametric,)),
-                 ("SubParametric", TestSubParametric, SubParametricImpl, subparamfunc, (TestSubParametric,)))
+        @testset "$s" for (s, interface, impl, funcs, interface_sigs) in
+                (("Basic",         TestInterface,     TestImpl,          [testfunc],               [(Int, TestInterface)]),
+                 ("Parametric",    TestParametric,    ParametricImpl,    [paramfunc],              [(TestParametric,)]),
+                 ("SubParametric", TestParametric,    SubParametricImpl, [paramfunc],              [(TestParametric,)]),
+                 ("SubParametric", TestSubParametric, SubParametricImpl, [subparamfunc],           [(TestSubParametric,)]),
+                 ("MultiFunc",     TestMultiFunc,     SubMultiFuncImpl,  [multifunc1, multifunc2], [(TestMultiFunc,), (TestMultiFunc,)]))
             intr = RI.getInterface(interface)
-            @test RI.functions(intr) == [func]
-            @test RI.methods(intr) == Tuple{Any,Tuple}[(func, interface_sig)]
+            @test RI.functions(intr) == funcs
+            @test all(Base.splat(==), zip(RI.methods(intr), zip(funcs, interface_sigs)))
             @test RI.check_interface_implemented(interface, impl)
         end
     end
@@ -43,5 +60,14 @@ subparamfunc(::SubParametricImpl{T}) where T = T
         func, sig = only(intr)
         @test func === testfunc
         @test sig === (Int, TestViolator)
-    end 
+    end
+
+    @testset "Double `@required`" begin
+        try
+            @eval DRMod @required DoubleRequired drfunc2(::DoubleRequired)
+        catch e
+            @test e isa LoadError
+            @test e.error isa ArgumentError
+        end
+    end
 end

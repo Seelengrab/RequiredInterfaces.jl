@@ -18,41 +18,64 @@ isInterface(_) = false
 
 Return the [`Interface`](@ref) described by  the type `T`.
 
-Throws an `ArgumentError` if the given type is not a registered interface.
+Throws a `MethodError` if the given type is not a registered interface.
 """
 function getInterface end
 
 """
     @required MyInterface func(::Foo, ::MyInterface)
     @required MyInterface function func(::Foo, ::MyInterface) end
+    @required MyInterface begin
+        foo(::B, ::MyInterface)
+        bar(::A, ::MyInterface)
+    end
 
-Marks all occurences of `MyInterface` in the given function signature as part of the interface `MyInterface`.
-Also defines a fallback method which throws a [`NotImplementedError`](@ref) when called with an argument that
+Marks all occurences of `MyInterface` in the given function signatures as part of the interface `MyInterface`.
+Also defines fallback methods, which throw a [`NotImplementedError`](@ref) when called with an argument that
 doesn't implement this mandatory function.
 
 Throws an `ArgumentError` if `MyInterface` is not an abstract type or the given expression doesn't conform to the
-two shown styles. The function body of the second style is expected to be empty - `@required` can't be used to
+three shown styles. The function body of the second style is expected to be empty - `@required` can't be used to
 mark fallback implementations as part of a user-implementable interface. Its sole purpose is marking
 parts of an API that a user needs to implement to be able to have functions expecting that interface work.
 """
 macro required(T::Symbol, expr::Expr)
-    if expr.head === :function 
-        funcsig = expr.args[1]
+    escT = esc(T)
+    abstrType = getproperty(__module__, T)
+    isabstracttype(abstrType) || throw(ArgumentError("Given `$T` is not an abstract type!"))
+    applicable(getInterface, abstrType) && throw(ArgumentError("`$T` is already registered as an interface.\nUse the `begin` block version to specify multiple methods as part of the interface `$T`."))
+
+    # Normalize argument expression
+    if expr.head === :function
+        expr = Expr(:block, expr)
     elseif expr.head === :call
-        funcsig = expr
-        expr = Expr(:function, expr, :())
+        expr = Expr(:block, Expr(:function, expr, :()))
+    elseif expr.head === :block
+        foreach(enumerate(expr.args)) do (i,e)
+            e isa LineNumberNode && return
+            e.head === :function && return
+            e.head !== :call && throw(ArgumentError("Given block contains code not part of the interface definition!"))
+            expr.args[i] = Expr(:function, e, :())
+        end
     else 
         throw(ArgumentError("Given expression is not a valid interface definition!"))
     end
-    sig = Symbol[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
-    msg = error_msg(funcsig.args[1], sig)
-    escT = esc(T)
-    isabstracttype(getproperty(__module__, T)) || throw(ArgumentError("Given `$T` is not an abstract type!"))
-    escFunc = esc(funcsig.args[1])
-    expr.args[1] = esc(expr.args[1])
-    push!(expr.args[2].args, :(throw(NotImplementedError(string($escT), $msg))))
-    res = ntuple(length(sig)) do i
-        getproperty(__module__, sig[i])
+
+    arr = Expr(:vect)
+    local escFunc
+
+    for e in expr.args
+        e isa LineNumberNode && continue
+        funcsig = e.args[1]
+        sig = Symbol[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
+        msg = error_msg(funcsig.args[1], sig)
+        escFunc = esc(funcsig.args[1])
+        e.args[1] = esc(e.args[1])
+        push!(e.args[2].args, :(throw(NotImplementedError(string($escT), $msg))))
+        res = ntuple(length(sig)) do i
+            getproperty(__module__, sig[i])
+        end
+        push!(arr.args, :(($escFunc, $res)))
     end
 
     funcdefs = quote
@@ -60,9 +83,7 @@ macro required(T::Symbol, expr::Expr)
         function RequiredInterfaces.getInterface(::Type{$escT})
             isInterface($escT) || throwNotAnInterface($escT)
             if !haskey(getInterfaceDict(), $escT)
-                arr = Tuple{Any, Tuple}[]
-                push!(arr, ($escFunc, $res))
-                getInterfaceDict()[$escT] = Interface($escT, arr)
+                getInterfaceDict()[$escT] = Interface($escT, $arr)
             else
                 getInterfaceDict()[$escT]
             end
@@ -204,9 +225,9 @@ function check_implementations(interface::Type, types=nonabstract_subtypes(inter
     isInterface(interface) || throwNotAnInterface(interface)
     @testset "Interface Check: $interface" begin
     @testset "$implementor" for implementor in types
-        @testset let args=(interface = interface, implementor = implementor)
+        # @testset let args=(interface = interface, implementor = implementor)
             @test check_interface_implemented(interface, implementor)
-        end
+        # end
     end
     end
 end
