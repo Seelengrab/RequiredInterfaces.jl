@@ -99,7 +99,7 @@ macro required(T::Symbol, expr::Expr)
 end
 
 function error_msg(f, sig)
-    msg = "$f(::" 
+    msg = "$f(::"
     msg *= join(sig, ", ::")
     msg * ")"
 end
@@ -225,9 +225,7 @@ function check_implementations(interface::Type, types=nonabstract_subtypes(inter
     isInterface(interface) || throwNotAnInterface(interface)
     @testset "Interface Check: $interface" begin
     @testset "$implementor" for implementor in types
-        # @testset let args=(interface = interface, implementor = implementor)
-            @test check_interface_implemented(interface, implementor)
-        # end
+        @test check_interface_implemented(interface, implementor)
     end
     end
 end

@@ -55,8 +55,8 @@ end
         end
     end
     @testset "Not completely implemented" begin
-        @test RI.check_interface_implemented(TestInterface, TestViolator) isa Vector{Tuple{Any,Tuple}}
         intr = RI.check_interface_implemented(TestInterface, TestViolator)
+        @test intr isa Vector{Tuple{Any,Tuple}}
         func, sig = only(intr)
         @test func === testfunc
         @test sig === (Int, TestViolator)
