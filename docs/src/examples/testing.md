@@ -21,8 +21,16 @@ The authors of package B would (rightly so) like to test that they have conforme
 at least insofar that they are dispatching correctly. With RequiredInterfaces.jl, this too can be easily
 done (think of this next block as placed in `runtests.jl`):
 
+!!! note "Testing environment"
+    RequiredInterfaces.jl relies heavily on reflection during testing, and so both the `Test` and
+    `InteractiveUtils` stdlibs are required to be in the environment where the checks displayed
+    here are performed. However, they are not necessary when only declaring interfaces; as such,
+    they are weak dependencies, only activated via a package extension. This has the added benefit of
+    not forcing packages making use of RequiredInterfaces.jl to directly depend on either `Test` or
+    `InteractiveUtils`.
+
 ```@example testing
-using Test, RequiredInterfaces
+using Test, InteractiveUtils, RequiredInterfaces
 const RI = RequiredInterfaces
 
 @test RI.check_interface_implemented(MyInterface, MyImplementor)

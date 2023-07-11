@@ -1,6 +1,6 @@
 module RequiredInterfaces
 
-using Test, InteractiveUtils, Logging
+using Logging
 
 export @required, NotImplementedError
 
@@ -8,8 +8,6 @@ export @required, NotImplementedError
     isInterface(::Type{T}) -> Bool
 
 Return whether the given (abstract) type is a recognized interface.
-
-Throws an `ArgumentError` if the given type is not a registered interface.
 """
 isInterface(_) = false
 
@@ -202,80 +200,31 @@ function Base.showerror(io::IO, nie::NotImplementedError)
               "Please implement `", nie.func, "` for your type `T <: ", nie.interface, "`.")
 end
 
-function nonabstract_subtypes(T=Any)
-    isabstracttype(T) || throw(ArgumentError("Only abstract types are supported! Got unsupported type: `$T`"))
-    subs = subtypes(T)
-    ret = filter(!isabstracttype, subs)
-    filter!(isabstracttype, subs)
+"""
+    check_implementations(interface::Type[, types])
 
-    while !isempty(subs)
-        ntype = popfirst!(subs)
-        ntype == Any && continue
-        nsubs = subtypes(ntype)
-        append!(ret, Iterators.filter(!isabstracttype, nsubs))
-        append!(subs, Iterators.filter(isabstracttype, nsubs))
-    end
+Checks whether the given `types` conform to the `interface`.
+Defaults to checking all non-abstract subtypes of `interface`.
 
-    ret
-end
+!!! warning "For testing only!"
+    This function requires loading the `Test` and `InteractiveUtils` stdlibs! It should only be called
+    in a testsuite, not in regular code.
+"""
+function check_implementations end
 
-throwNotAnInterface(interface) = throw(ArgumentError("`$interface` is not a registered interface."))
+"""
+    check_interfacce_implemented(interface::Type, implementor::Type)
 
-function check_implementations(interface::Type, types=nonabstract_subtypes(interface))
-    isInterface(interface) || throwNotAnInterface(interface)
-    @testset "Interface Check: $interface" begin
-    @testset "$implementor" for implementor in types
-        @test check_interface_implemented(interface, implementor)
-    end
-    end
-end
+Checks whether the given type `implementor` conforms to the given `interface`.
+`implementor` currently needs to be a non-abstract type.
 
-valid_globalref(gr) = gr.mod === RequiredInterfaces && gr.name === :NotImplementedError
+Returns either `true` or an object containing the methods of the `interface` that
+`implementor` doesn't implement.
 
-function check_interface_implemented(interface::Type, implementor::Type)
-    isInterface(interface) || throwNotAnInterface(interface)
-    isabstracttype(implementor) && throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
-    sigs = methods(getInterface(interface))
-    failures = Tuple{Any,Tuple}[]
-    for sig in sigs
-        func, interfacetypes = sig
-        argtypes = ntuple(length(interfacetypes)) do i
-            itype = interfacetypes[i]
-            itype === interface ? implementor : itype
-        end
-        matches = Base.methods(func, argtypes)
-        if length(matches) != 1
-            found = map(matches) do m
-                typs = if m.sig isa DataType
-                    m.sig.types
-                elseif m.sig isa UnionAll
-                    m.sig.body.types
-                end
-                (typs[2:end]...,)
-            end
-            filter!(!=(interfacetypes), found)
-            @warn "Not all signatures required matching $func$argtypes are implemented." Found=found
-            push!(failures, (func, argtypes))
-            continue
-        end
-        ct, rettype = only(code_typed(func, argtypes))
-        rettype !== Union{} && continue # if it infers, we can't throw our error
-        isempty(ct.code) && continue # empty function
-        offset = ct.code[1] isa Expr && ct.code[1].head === :code_coverage_effect
-        length(ct.code) < 2 && continue # function with only one expr - not our code
-        offset += ct.code[2] isa Expr && ct.code[2].head === :code_coverage_effect
-        length(ct.code) < (offset + 2) && continue # function with 2 expr not from us
-        errorExpr = ct.code[offset + 2]
-        errorExpr isa Expr || continue # not our Error? could be a change in IR
-        errorExpr.head === :call || continue
-        isempty(errorExpr.args) && continue # weird Expr?
-        gr =  errorExpr.args[1]
-        if gr isa GlobalRef && valid_globalref(gr)
-            push!(failures, (func, argtypes)) # found one!
-        end
-    end
-
-    return isempty(failures) || return failures
-end
+!!! warning "For testing only!"
+    This function requires loading the `Test` and `InteractiveUtils` stdlibs! It should only be called
+    in a testsuite, not in regular code.
+"""
+function check_interface_implemented end
 
 end # module RequiredInterfaces
