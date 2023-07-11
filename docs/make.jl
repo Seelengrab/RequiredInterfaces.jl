@@ -20,6 +20,7 @@ function builddocs(clear=false)
             "Main Page" => "index.md",
             "Examples" => [
                 "examples/basic.md",
+                "examples/multifuncs.md",
                 "examples/testing.md"
             ],
             "About Interfaces" => "interfaces.md",
