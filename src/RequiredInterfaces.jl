@@ -260,8 +260,12 @@ function check_interface_implemented(interface::Type, implementor::Type)
         end
         ct, rettype = only(code_typed(func, argtypes))
         rettype !== Union{} && continue # if it infers, we can't throw our error
-        length(ct.code) >= 2 || continue # likely implemented
-        errorExpr = ct.code[2]
+        isempty(ct.code) && continue # empty function
+        offset = ct.code[1] isa Expr && ct.code[1].head === :code_coverage_effect
+        length(ct.code) < 2 && continue # function with only one expr - not our code
+        offset += ct.code[2] isa Expr && ct.code[2].head === :code_coverage_effect
+        length(ct.code) < (offset + 2) && continue # function with 2 expr not from us
+        errorExpr = ct.code[offset + 2]
         errorExpr isa Expr || continue # not our Error? could be a change in IR
         errorExpr.head === :call || continue
         isempty(errorExpr.args) && continue # weird Expr?
