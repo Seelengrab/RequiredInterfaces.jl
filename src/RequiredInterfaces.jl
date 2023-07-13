@@ -83,7 +83,9 @@ macro required(T::Symbol, expr::Expr)
         function RequiredInterfaces.getInterface(::Type{$escT})
             isInterface($escT) || throwNotAnInterface($escT)
             if !haskey(getInterfaceDict(), $escT)
-                getInterfaceDict()[$escT] = Interface($escT, $arr)
+                intr::Vector{Tuple{Any,Tuple}} = $arr
+                gatherInterface!(intr, supertype($escT))
+                getInterfaceDict()[$escT] = Interface($escT, intr)
             else
                 getInterfaceDict()[$escT]
             end
@@ -96,6 +98,57 @@ macro required(T::Symbol, expr::Expr)
         $escFunc
     )
     return retcode
+end
+
+function gatherInterface!(arr, T::Type)
+    T === Any && return arr
+    if isInterface(T)
+        mergeInterfaces!(arr, methods(getInterface(T)))
+    else
+        gatherInterface!(arr, supertype(T))
+    end
+end
+
+function mergeInterfaces!(dest, src)
+    # TODO: This is likely a performance bottleneck for some usecase, but it ought to be cached anyway
+    dest_dict = Dict{Any,Vector{Tuple}}()
+    for (f, args) in dest
+        arr = get!(() -> Tuple[], dest_dict, f)
+        push!(arr, args)
+    end
+    src_dict = Dict{Any,Vector{Tuple}}()
+    for (f, args) in src
+        arr = get!(() -> Tuple[], src_dict, f)
+        push!(arr, args)
+    end
+    for sk in keys(src_dict)
+        if !haskey(dest_dict, sk)
+            dest_dict[sk] = copy(src_dict[sk])
+            continue
+        end
+        dest_arr = dest_dict[sk]
+        src_arr = src_dict[sk]
+        for src_types in src_arr
+            morespec = any(dest_arr) do dest_types
+                sig_source = Base.signature_type(sk, src_types)
+                sig_dest = Base.signature_type(sk, dest_types)
+                Base.morespecific(sig_dest, sig_source)
+            end
+            if morespec
+                # we already have a more specific fallback method
+                continue
+            else
+                # there's no fallback, so implement it
+                push!(dest_arr, src_types)
+            end
+        end
+    end
+    res = mapreduce(vcat, keys(dest_dict)) do func
+        [ (func, argtypes) for argtypes in dest_dict[func] ]
+    end
+    # this is super inefficient
+    empty!(dest)
+    append!(dest, res)
 end
 
 function error_msg(f, sig)
@@ -246,7 +299,7 @@ valid_globalref(gr) = gr.mod === RequiredInterfaces && gr.name === :NotImplement
 function check_interface_implemented(interface::Type, implementor::Type)
     isInterface(interface) || throwNotAnInterface(interface)
     isabstracttype(implementor) && throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
-    sigs = mapreduce(methods ∘ getInterface, hcat, interface_supertypes(interface))
+    sigs = methods(getInterface(interface))
     failures = Tuple{Any, Tuple}[]
     for sig in sigs
         func, interfacetypes = sig

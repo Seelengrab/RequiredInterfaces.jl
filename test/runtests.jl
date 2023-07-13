@@ -49,14 +49,18 @@ module DRMod
     @required DoubleRequired drfunc1(::DoubleRequired)
 end
 
+const interfaces = (
+    ("Basic",                        TestInterface,     TestImpl,          [testfunc],                [(Int, TestInterface)]),
+    ("Parametric",                   TestParametric,    ParametricImpl,    [paramfunc],               [(TestParametric,)]),
+    ("TestParametric+SubParametric", TestParametric,    SubParametricImpl, [paramfunc],               [(TestParametric,)]),
+    ("SubParametric",                TestSubParametric, SubParametricImpl, [subparamfunc, paramfunc], [(TestSubParametric,)]),
+    ("MultiFunc",                    TestMultiFunc,     SubMultiFuncImpl,  [multifunc1, multifunc2],  [(TestMultiFunc,), (TestMultiFunc,)]),
+    ("NoFallback",                   TestSubNoFallback, SubNoFallbackImpl, [nofallback, paramfunc],   [(TestSubNoFallback,), (TestParametric,)])
+)
+
 @testset "All tests" begin
     @testset "Correct implementation" begin
-        @testset "$s" for (s, interface, impl, funcs, interface_sigs) in
-                (("Basic",         TestInterface,     TestImpl,          [testfunc],               [(Int, TestInterface)]),
-                 ("Parametric",    TestParametric,    ParametricImpl,    [paramfunc],              [(TestParametric,)]),
-                 ("SubParametric", TestParametric,    SubParametricImpl, [paramfunc],              [(TestParametric,)]),
-                 ("SubParametric", TestSubParametric, SubParametricImpl, [subparamfunc],           [(TestSubParametric,)]),
-                 ("MultiFunc",     TestMultiFunc,     SubMultiFuncImpl,  [multifunc1, multifunc2], [(TestMultiFunc,), (TestMultiFunc,)]))
+        @testset "$s" for (s, interface, impl, funcs, interface_sigs) in interfaces
             intr = RI.getInterface(interface)
             @test RI.functions(intr) == funcs
             @test all(Base.splat(==), zip(RI.methods(intr), zip(funcs, interface_sigs)))
