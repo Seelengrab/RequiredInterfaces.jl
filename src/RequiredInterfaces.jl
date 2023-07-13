@@ -219,6 +219,17 @@ function nonabstract_subtypes(T=Any)
     ret
 end
 
+function interface_supertypes(T::Type)
+    (T isa Union || T === Union{}) && throw(ArgumentError("Can't get interface superttypes of a union: `$T`"))
+    interface_supertypes!(Type[], T)
+end
+
+function interface_supertypes!(res, T::Type)
+    T === Any && return res
+    isInterface(T) && push!(res, T)
+    interface_supertypes!(res, supertype(T))
+end
+
 throwNotAnInterface(interface) = throw(ArgumentError("`$interface` is not a registered interface."))
 
 function check_implementations(interface::Type, types=nonabstract_subtypes(interface))
@@ -235,13 +246,13 @@ valid_globalref(gr) = gr.mod === RequiredInterfaces && gr.name === :NotImplement
 function check_interface_implemented(interface::Type, implementor::Type)
     isInterface(interface) || throwNotAnInterface(interface)
     isabstracttype(implementor) && throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
-    sigs = methods(getInterface(interface))
-    failures = Tuple{Any,Tuple}[]
+    sigs = mapreduce(methods ∘ getInterface, hcat, interface_supertypes(interface))
+    failures = Tuple{Any, Tuple}[]
     for sig in sigs
         func, interfacetypes = sig
         argtypes = ntuple(length(interfacetypes)) do i
             itype = interfacetypes[i]
-            itype === interface ? implementor : itype
+            interface <: itype ? implementor : itype
         end
         matches = Base.methods(func, argtypes)
         if length(matches) != 1

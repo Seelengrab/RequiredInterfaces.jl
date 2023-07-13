@@ -20,9 +20,18 @@ abstract type TestSubParametric{T} <: TestParametric{T} end
 paramfunc(::TestSubParametric{T}) where T = T
 @required TestSubParametric subparamfunc(::TestSubParametric)
 
+abstract type TestSubNoFallback{T} <: TestParametric{T} end
+@required TestSubNoFallback nofallback(::TestSubNoFallback)
+
 struct SubParametricImpl{T} <: TestSubParametric{T} end
 # only the additional interface needs to be implemented
 subparamfunc(::SubParametricImpl{T}) where T = T
+
+struct SubNoFallbackViolator{T} <: TestSubNoFallback{T} end
+
+struct SubNoFallbackImpl{T} <: TestSubNoFallback{T} end
+nofallback(::SubNoFallbackImpl{T}) where T = T
+paramfunc(::SubNoFallbackImpl{T}) where T = T
 
 abstract type TestMultiFunc end
 @required TestMultiFunc begin
@@ -55,11 +64,20 @@ end
         end
     end
     @testset "Not completely implemented" begin
-        intr = RI.check_interface_implemented(TestInterface, TestViolator)
-        @test intr isa Vector{Tuple{Any,Tuple}}
-        func, sig = only(intr)
-        @test func === testfunc
-        @test sig === (Int, TestViolator)
+        @testset "Basic" begin
+            intr = RI.check_interface_implemented(TestInterface, TestViolator)
+            @test intr isa Vector{Tuple{Any, Tuple}}
+            func, sig = only(intr)
+            @test func === testfunc
+            @test sig == (Int, TestViolator)
+        end
+        @testset "Inherited interfaces" begin
+            intr = RI.check_interface_implemented(TestSubNoFallback, SubNoFallbackViolator)
+            @test intr isa Vector{Tuple{Any, Tuple}}
+            comp = [ (nofallback, (SubNoFallbackViolator,)),
+                     (paramfunc, (SubNoFallbackViolator,))]
+            @test intr == comp
+        end
     end
 
     @testset "Double `@required`" begin
