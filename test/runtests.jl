@@ -53,7 +53,7 @@ const interfaces = (
     ("Basic",                        TestInterface,     TestImpl,          [testfunc],                [(Int, TestInterface)]),
     ("Parametric",                   TestParametric,    ParametricImpl,    [paramfunc],               [(TestParametric,)]),
     ("TestParametric+SubParametric", TestParametric,    SubParametricImpl, [paramfunc],               [(TestParametric,)]),
-    ("SubParametric",                TestSubParametric, SubParametricImpl, [subparamfunc, paramfunc], [(TestSubParametric,)]),
+    ("SubParametric",                TestSubParametric, SubParametricImpl, [subparamfunc, paramfunc], [(TestSubParametric,), (TestParametric,)]),
     ("MultiFunc",                    TestMultiFunc,     SubMultiFuncImpl,  [multifunc1, multifunc2],  [(TestMultiFunc,), (TestMultiFunc,)]),
     ("NoFallback",                   TestSubNoFallback, SubNoFallbackImpl, [nofallback, paramfunc],   [(TestSubNoFallback,), (TestParametric,)])
 )
@@ -62,8 +62,8 @@ const interfaces = (
     @testset "Correct implementation" begin
         @testset "$s" for (s, interface, impl, funcs, interface_sigs) in interfaces
             intr = RI.getInterface(interface)
-            @test RI.functions(intr) == funcs
-            @test all(Base.splat(==), zip(RI.methods(intr), zip(funcs, interface_sigs)))
+            @test Set(RI.functions(intr)) == Set(funcs)
+            @test Set(RI.methods(intr)) == Set(zip(funcs, interface_sigs))
             @test RI.check_interface_implemented(interface, impl)
         end
     end
@@ -78,9 +78,9 @@ const interfaces = (
         @testset "Inherited interfaces" begin
             intr = RI.check_interface_implemented(TestSubNoFallback, SubNoFallbackViolator)
             @test intr isa Vector{Tuple{Any, Tuple}}
-            comp = [ (nofallback, (SubNoFallbackViolator,)),
-                     (paramfunc, (SubNoFallbackViolator,))]
-            @test intr == comp
+            comp = Set([ (nofallback, (SubNoFallbackViolator,)),
+                         (paramfunc, (SubNoFallbackViolator,))])
+            @test Set(intr) == comp
         end
     end
 
