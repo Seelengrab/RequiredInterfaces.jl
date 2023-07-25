@@ -5,6 +5,17 @@ using Test, InteractiveUtils, Logging
 export @required, NotImplementedError
 
 """
+    Interface
+
+A struct describing the notion of an (abstract-)type-based interface.
+"""
+struct Interface
+    type::Type
+    required::Vector{Tuple{Any,Tuple}}
+    provided::Vector{Tuple{Any,Tuple}}
+end
+
+"""
     isInterface(::Type{T}) -> Bool
 
 Return whether the given (abstract) type is a recognized interface.
@@ -21,6 +32,103 @@ Return the [`Interface`](@ref) described by  the type `T`.
 Throws a `MethodError` if the given type is not a registered interface.
 """
 function getInterface end
+
+"""
+    requiresMethods(::Type{T}) -> Bool
+
+Return whether the given (abstract type) requires methods.
+
+See also [`providesMethods`](@ref).
+"""
+requiresMethods(_) = false
+
+"""
+    providesMethods(::Type{T}) -> Bool
+
+Return whether the given (abstract type) provides methods.
+
+See also [`providesMethods`](@ref).
+"""
+providesMethods(_) = false
+
+appendRequired!(_::Type, _::Interface) = nothing
+appendProvided!(_::Type, _::Interface) = nothing
+
+"""
+    @provided MyInterface func(::Foo, ::MyInterface)
+    @provided MyInterface function func(::Foo, ::MyInterface) end
+    @provided MyInterface begin
+        foo(::B, ::MyInterface)
+        bar(::A, ::MyInterface)
+    end
+
+Marks all occurences of `MyInterface` in the given function signatures as part of the interface `MyInterface`.
+The methods contained in this macro are marked as being _provided_, once a subtype of `MyInterface` implements
+the corresponding methods from `@required`.
+
+Throws an `ArgumentError` if `MyInterface` is not an abstract type or the given expression doesn't conform to the
+three shown styles. The function body of the second style is expected to be empty - `@provided` can't be used to
+mark fallback implementations as part of a user-implementable interface. Its sole purpose is marking
+parts of an API that a user needs to implement to be able to have functions expecting that interface work.
+"""
+macro provided(T::Symbol, expr::Expr)
+    escT = esc(T)
+    abstrType = getproperty(__module__, T)
+    isabstracttype(abstrType) || throw(ArgumentError("Given `$T` is not an abstract type!"))
+    providesMethods(abstrType) && throw(ArgumentError("`$T` is already registered as an interface providing methods.\nUse the `begin` block version to specify multiple methods as part of the interface `$T`."))
+
+    # Normalize argument expression
+    if expr.head === :function
+        expr = Expr(:block, expr)
+    elseif expr.head === :call
+        expr = Expr(:block, Expr(:function, expr, :()))
+    elseif expr.head === :block
+        foreach(enumerate(expr.args)) do (i,e)
+            e isa LineNumberNode && return
+            e.head === :function && return
+            e.head !== :call && throw(ArgumentError("Given block contains code not part of the interface definition!"))
+            expr.args[i] = Expr(:function, e, :())
+        end
+    else 
+        throw(ArgumentError("Given expression is not a valid interface definition!"))
+    end
+
+    getInterfaceExpr = if applicable(getInterface, abstrType)
+        # no need to redefine an interface method if it's already been defined
+        nothing
+    else
+        quote
+            RequiredInterfaces.isInterface(::Type{$escT}) = true
+            function RequiredInterfaces.getInterface(::Type{$escT})
+                isInterface($escT) || throwNotAnInterface($escT)
+                intr = get!(getInterfaceDict(), $escT) do
+                    Interface($escT, Tuple{Any,Tuple}[], Tuple{Any,Tuple}[])
+                end    
+
+                appendRequired!($escT, intr)
+                appendProvided!($escT, intr)
+
+                return intr
+            end
+        end
+    end
+
+    funcdefs = quote
+        RequiredInterfaces.providesMethods(::Type{$escT}) = true
+        RequiredInterfaces.appendProvided!(::Type{$escT}, i::RequiredInterfaces.Interface) = if requiresMethods($escT) && isempty(i.provided)
+            append!(i.provided, $arr)
+        end
+    end
+
+    retcode = :(
+        $expr;
+        $funcdefs;
+        $getInterfaceExpr;
+        $escFunc
+    )
+
+    return retcode
+end
 
 """
     @required MyInterface func(::Foo, ::MyInterface)
@@ -43,7 +151,24 @@ macro required(T::Symbol, expr::Expr)
     escT = esc(T)
     abstrType = getproperty(__module__, T)
     isabstracttype(abstrType) || throw(ArgumentError("Given `$T` is not an abstract type!"))
-    applicable(getInterface, abstrType) && throw(ArgumentError("`$T` is already registered as an interface.\nUse the `begin` block version to specify multiple methods as part of the interface `$T`."))
+    requiresMethods(abstrType) && throw(ArgumentError("`$T` is already registered as an interface requiring methods.\nUse the `begin` block version to specify multiple methods as part of the interface `$T`."))
+
+    arr = Expr(:vect)
+    local escFunc
+
+    for e in expr.args
+        e isa LineNumberNode && continue
+        funcsig = e.args[1]
+        sig = Symbol[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
+        msg = error_msg(funcsig.args[1], sig)
+        escFunc = esc(funcsig.args[1])
+        e.args[1] = esc(e.args[1])
+        push!(e.args[2].args, :(throw(NotImplementedError(string($escT), $msg))))
+        res = ntuple(length(sig)) do i
+            getproperty(__module__, sig[i])
+        end
+        push!(arr.args, :(($escFunc, $res)))
+    end
 
     # Normalize argument expression
     if expr.head === :function
@@ -78,21 +203,36 @@ macro required(T::Symbol, expr::Expr)
         push!(arr.args, :(($escFunc, $res)))
     end
 
-    funcdefs = quote
-        RequiredInterfaces.isInterface(::Type{$escT}) = true
-        function RequiredInterfaces.getInterface(::Type{$escT})
-            isInterface($escT) || throwNotAnInterface($escT)
-            if !haskey(getInterfaceDict(), $escT)
-                getInterfaceDict()[$escT] = Interface($escT, $arr)
-            else
-                getInterfaceDict()[$escT]
+    getInterfaceExpr = if applicable(getInterface, abstrType)
+        nothing
+    else
+        quote
+            RequiredInterfaces.isInterface(::Type{$escT}) = true
+            function RequiredInterfaces.getInterface(::Type{$escT})
+                isInterface($escT) || throwNotAnInterface($escT)
+                intr = get!(getInterfaceDict(), $escT) do
+                    Interface($escT, Tuple{Any,Tuple}[], Tuple{Any,Tuple}[])
+                end    
+
+                appendRequired!($escT, intr)
+                appendProvided!($escT, intr)
+
+                return intr
             end
+        end
+    end
+
+    funcdefs = quote
+        RequiredInterfaces.requiresMethods(::Type{$escT}) = true
+        RequiredInterfaces.appendRequired!(::Type{$escT}, i::RequiredInterfaces.Interface) = if requiresMethods($escT) && isempty(i.required)
+            append!(i.required, $arr)
         end
     end
 
     retcode = :(
         $expr;
         $funcdefs;
+        $getInterfaceExpr;
         $escFunc
     )
     return retcode
@@ -104,15 +244,6 @@ function error_msg(f, sig)
     msg * ")"
 end
 
-"""
-    Interface
-
-A struct describing the notion of an (abstract-)type-based interface.
-"""
-struct Interface
-    type::Type
-    meths::Vector{Tuple{Any,Tuple}}
-end
 
 Base.:(==)(a::Interface, b::Interface) = a.type == b.type && all(splat(==), zip(a.meths, b.meths))
 Base.hash(a::Interface, u::UInt) = hash(a.type, foldr(hash, a.meths; init=u))
@@ -123,19 +254,34 @@ Base.hash(a::Interface, u::UInt) = hash(a.type, foldr(hash, a.meths; init=u))
 Returns the functions that are required by this interface.
 """
 function functions(i::Interface)
-    unique!(map(methods(i)) do (f,_)
+    reqs = map(required(i)) do (f,_)
         f
-    end)
+    end
+    prov = map(provided(i)) do (f,_)
+        f
+    end
+    unique!(union(reqs, prov))
 end
 
 """
-    methods(i::Interface)
+    required(i::Interface)
 
 Return the methods (i.e., functions and their signatures) required to be implemented by this interface.
 
-See also [`functions`](@ref).
+See also [`functions`](@ref), [`provided`](@ref).
 """
-methods(i::Interface) = i.meths
+required(i::Interface) = i.required
+
+@deprecate methods(i::Interface) required(i::Interface) false
+
+"""
+    provided(i::Interface)
+
+Return the methods (i.e., the functions and their signatures) provided when implementing this interface.
+
+See also [`functions`](@ref), [`required`](@ref).
+"""
+provided(i::Interface) = i.provided
 
 """
     interfaceType(i::Interface)
@@ -235,7 +381,7 @@ valid_globalref(gr) = gr.mod === RequiredInterfaces && gr.name === :NotImplement
 function check_interface_implemented(interface::Type, implementor::Type)
     isInterface(interface) || throwNotAnInterface(interface)
     isabstracttype(implementor) && throw(ArgumentError("Checking abstract types for compliance is currently unsupported."))
-    sigs = methods(getInterface(interface))
+    sigs = required(getInterface(interface))
     failures = Tuple{Any,Tuple}[]
     for sig in sigs
         func, interfacetypes = sig

@@ -50,7 +50,8 @@ end
                  ("MultiFunc",     TestMultiFunc,     SubMultiFuncImpl,  [multifunc1, multifunc2], [(TestMultiFunc,), (TestMultiFunc,)]))
             intr = RI.getInterface(interface)
             @test RI.functions(intr) == funcs
-            @test all(Base.splat(==), zip(RI.methods(intr), zip(funcs, interface_sigs)))
+            @test all(Base.splat(==), zip(RI.required(intr), zip(funcs, interface_sigs)))
+            @test_deprecated RI.methods(intr)
             @test RI.check_interface_implemented(interface, impl)
         end
     end
