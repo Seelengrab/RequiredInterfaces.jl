@@ -40,6 +40,14 @@ module DRMod
     @required DoubleRequired drfunc1(::DoubleRequired)
 end
 
+abstract type ProvidedTest end
+prov(pt::ProvidedTest) = req(pt)
+@required ProvidedTest req(::ProvidedTest)
+@provided ProvidedTest prov(::ProvidedTest)
+
+struct ProvidedSub <: ProvidedTest end
+req(::ProvidedSub) = "works"
+
 @testset "All tests" begin
     @testset "Correct implementation" begin
         @testset "$s" for (s, interface, impl, funcs, interface_sigs) in
@@ -70,5 +78,13 @@ end
             @test e isa LoadError
             @test e.error isa ArgumentError
         end
+    end
+
+    @testset "Provided interfaces" begin
+        intr = RI.getInterface(ProvidedTest)
+        provs = RI.provided(intr)
+        @test only(provs) == (prov, (ProvidedTest,))
+        @test length(methods(prov)) == 1
+        @test prov(ProvidedSub()) == "works"
     end
 end

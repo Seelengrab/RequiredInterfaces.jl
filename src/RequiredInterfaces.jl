@@ -2,7 +2,7 @@ module RequiredInterfaces
 
 using Test, InteractiveUtils, Logging
 
-export @required, NotImplementedError
+export @required, @provided, NotImplementedError
 
 """
     Interface
@@ -93,6 +93,22 @@ macro provided(T::Symbol, expr::Expr)
         throw(ArgumentError("Given expression is not a valid interface definition!"))
     end
 
+    arr = Expr(:vect)
+
+    for e in expr.args
+        e isa LineNumberNode && continue
+        funcsig = e.args[1]
+        sig = Symbol[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
+        msg = error_msg(funcsig.args[1], sig)
+        escFunc = esc(funcsig.args[1])
+        e.args[1] = esc(e.args[1])
+        push!(e.args[2].args, :(throw(NotImplementedError(string($escT), $msg))))
+        res = ntuple(length(sig)) do i
+            getproperty(__module__, sig[i])
+        end
+        push!(arr.args, :(($escFunc, $res)))
+    end
+
     getInterfaceExpr = if applicable(getInterface, abstrType)
         # no need to redefine an interface method if it's already been defined
         nothing
@@ -121,10 +137,9 @@ macro provided(T::Symbol, expr::Expr)
     end
 
     retcode = :(
-        $expr;
         $funcdefs;
         $getInterfaceExpr;
-        $escFunc
+        nothing
     )
 
     return retcode
@@ -152,23 +167,6 @@ macro required(T::Symbol, expr::Expr)
     abstrType = getproperty(__module__, T)
     isabstracttype(abstrType) || throw(ArgumentError("Given `$T` is not an abstract type!"))
     requiresMethods(abstrType) && throw(ArgumentError("`$T` is already registered as an interface requiring methods.\nUse the `begin` block version to specify multiple methods as part of the interface `$T`."))
-
-    arr = Expr(:vect)
-    local escFunc
-
-    for e in expr.args
-        e isa LineNumberNode && continue
-        funcsig = e.args[1]
-        sig = Symbol[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
-        msg = error_msg(funcsig.args[1], sig)
-        escFunc = esc(funcsig.args[1])
-        e.args[1] = esc(e.args[1])
-        push!(e.args[2].args, :(throw(NotImplementedError(string($escT), $msg))))
-        res = ntuple(length(sig)) do i
-            getproperty(__module__, sig[i])
-        end
-        push!(arr.args, :(($escFunc, $res)))
-    end
 
     # Normalize argument expression
     if expr.head === :function
