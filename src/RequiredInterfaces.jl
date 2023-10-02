@@ -67,13 +67,28 @@ macro required(T::Symbol, expr::Expr)
     for e in expr.args
         e isa LineNumberNode && continue
         funcsig = e.args[1]
-        sig = Symbol[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
-        msg = error_msg(funcsig.args[1], sig)
-        escFunc = esc(funcsig.args[1])
+        sig = Any[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
+        funcpart = funcsig.args[1]
+        if !(funcpart isa Symbol)
+            if funcpart isa Expr && funcpart.head == Symbol("::")
+                funcpart = funcpart.args[2]
+            else
+                throw(ArgumentError("Unsupported required function syntax: `$funcpart`"))
+            end
+        end
+        msg = error_msg(funcpart, sig)
+        escFunc = esc(funcpart)
         e.args[1] = esc(e.args[1])
         push!(e.args[2].args, :(throw(NotImplementedError(string($escT), $msg))))
         res = ntuple(length(sig)) do i
-            getproperty(__module__, sig[i])
+            s = sig[i]
+            if s isa Symbol
+                getproperty(__module__, sig[i])
+            elseif s isa Expr && s.head == :curly && length(s.args) == 2 &&  first(s.args) == :Type
+                Type{getproperty(__module__, last(s.args))}
+            else
+                throw(ArgumentError("Invalid required function!"))
+            end
         end
         push!(arr.args, :(($escFunc, $res)))
     end
@@ -305,9 +320,19 @@ function check_interface_implemented(interface::Type, implementor::Type)
         func, interfacetypes = sig
         argtypes = ntuple(length(interfacetypes)) do i
             itype = interfacetypes[i]
-            interface <: itype ? implementor : itype
+            if interface <: itype 
+                implementor 
+            elseif itype isa Type && itype.name == Base.typename(Type)
+                Type{implementor}
+            else
+                itype
+            end
         end
-        matches = Base.methods(func, argtypes)
+        matches = if func isa Type
+            instancemethods(func, argtypes)
+        else
+            Base.methods(func, argtypes)
+        end
         if length(matches) != 1
             found = map(matches) do m
                 typs = if m.sig isa DataType
@@ -340,6 +365,27 @@ function check_interface_implemented(interface::Type, implementor::Type)
     end
 
     return isempty(failures) || return failures
+end
+
+function instance_signature_type(t::Type, @nospecialize(argtypes))
+    argtypes = Base.to_tuple_type(argtypes)
+    u = Base.unwrap_unionall(argtypes)::DataType
+    return Base.rewrap_unionall(Tuple{t,u.parameters...}, argtypes)
+end
+
+function instancemethods(t::Type,
+                         @nospecialize(tmatch),
+                         mod::Union{Tuple{Module},AbstractArray{Module},Nothing}=nothing)
+    world = Base.get_world_counter()
+    ms = Method[]
+    tt = instance_signature_type(t, tmatch)
+    for m in Base._methods_by_ftype(tt, -1, Base.get_world_counter())::Vector
+        m = m::Core.MethodMatch
+        (mod === nothing || parentmodule(m.method) ∈ mod) && push!(ms, m.method)
+    end
+    t === Function && return Base.MethodList(ms, typeof(t).name.mt)
+    mt = Base.typename(t).mt
+    return Base.MethodList(ms, mt)
 end
 
 end # module RequiredInterfaces

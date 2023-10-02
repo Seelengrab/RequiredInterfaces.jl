@@ -49,6 +49,11 @@ module DRMod
     @required DoubleRequired drfunc1(::DoubleRequired)
 end
 
+module TypeMod
+    using RequiredInterfaces
+    abstract type TypeInterface end
+end
+
 const interfaces = (
     ("Basic",                        TestInterface,     TestImpl,          [testfunc],                [(Int, TestInterface)]),
     ("Parametric",                   TestParametric,    ParametricImpl,    [paramfunc],               [(TestParametric,)]),
@@ -91,5 +96,20 @@ const interfaces = (
             @test e isa LoadError
             @test e.error isa ArgumentError
         end
+    end
+
+    @testset "Interface taking a type" begin
+        @eval TypeMod begin
+            @required TypeInterface foo(::Type{TypeInterface})
+            struct TypeViolator <: TypeInterface end
+            struct TypeImpl <: TypeInterface end
+            foo(::Type{TypeImpl}) = "implemented!"
+        end
+        @test RI.check_interface_implemented(TypeMod.TypeInterface, TypeMod.TypeImpl)
+        intr = RI.check_interface_implemented(TypeMod.TypeInterface, TypeMod.TypeViolator)
+        @test intr isa Vector{Tuple{Any, Tuple}}
+        func, sig = only(intr)
+        @test func === TypeMod.foo
+        @test sig == (Type{TypeMod.TypeViolator},)
     end
 end
