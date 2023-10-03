@@ -69,6 +69,17 @@ const interfaces = (
 )
 
 @testset "All tests" begin
+    @testset "Interface Equality & hashing" begin
+        a = RI.getInterface(TestInterface)
+        b = RI.getInterface(TestParametric)
+        @test a == a && hash(a) == hash(a)
+        @test a != b && hash(a) != hash(b)
+        # ensure differing lengths lead to different results
+        c = RI.Interface(a.type, copy(a.meths))
+        push!(c.meths, (:baz, ()))
+        @test a != c && hash(a) != hash(c)
+    end
+    
     @testset "Correct implementation" begin
         @testset "$s" for (s, interface, impl, funcs, interface_sigs) in interfaces
             intr = RI.getInterface(interface)

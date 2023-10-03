@@ -182,7 +182,7 @@ struct Interface
     meths::Vector{Tuple{Any,Tuple}}
 end
 
-Base.:(==)(a::Interface, b::Interface) = a.type == b.type && all(splat(==), zip(a.meths, b.meths))
+Base.:(==)(a::Interface, b::Interface) = a.type == b.type && length(a.meths) == length(b.meths) && all(splat(==), zip(a.meths, b.meths))
 Base.hash(a::Interface, u::UInt) = hash(a.type, foldr(hash, a.meths; init=u))
 
 """
