@@ -54,6 +54,11 @@ module TypeMod
     abstract type TypeInterface end
 end
 
+module LinArrayMod
+    using RequiredInterfaces
+    abstract type LinearArray{T,N} <: AbstractArray{T,N} end
+end
+
 const interfaces = (
     ("Basic",                        TestInterface,     TestImpl,          [testfunc],                [(Int, TestInterface)]),
     ("Parametric",                   TestParametric,    ParametricImpl,    [paramfunc],               [(TestParametric,)]),
@@ -111,5 +116,19 @@ const interfaces = (
         func, sig = only(intr)
         @test func === TypeMod.foo
         @test sig == (Type{TypeMod.TypeViolator},)
+    end
+
+    @testset "Extending Base" begin
+        @eval LinArrayMod begin
+            @required LinearArray begin
+                Base.size(::LinearArray)
+                Base.getindex(::LinearArray, ::Int)
+            end
+        end
+    meths = RI.methods(RI.getInterface(LinArrayMod.LinearArray))
+        @test meths isa Vector{Tuple{Any,Tuple}}
+        @test (:size, (LinArrayMod.LinearArray,)) in meths
+        @test (:getindex, (LinArrayMod.LinearArray,Int)) in meths
+        @test length(meths) == 2
     end
 end

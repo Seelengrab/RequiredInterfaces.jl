@@ -70,7 +70,7 @@ macro required(T::Symbol, expr::Expr)
         sig = Any[ a isa Symbol ? :Any : last(a.args) for a in funcsig.args[2:end] ]
         funcpart = funcsig.args[1]
         if !(funcpart isa Symbol)
-            if funcpart isa Expr && funcpart.head == Symbol("::")
+            if funcpart isa Expr && funcpart.head in (Symbol("::"), Symbol("."))
                 funcpart = funcpart.args[2]
             else
                 throw(ArgumentError("Unsupported required function syntax: `$funcpart`"))
