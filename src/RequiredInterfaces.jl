@@ -71,7 +71,7 @@ macro required(T::Symbol, expr::Expr)
         funcpart = funcsig.args[1]
         if !(funcpart isa Symbol)
             if funcpart isa Expr && funcpart.head in (Symbol("::"), Symbol("."))
-                funcpart = funcpart.args[2]
+                funcpart = funcpart.head == Symbol("::") ? last(funcpart.args) : funcpart
             else
                 throw(ArgumentError("Unsupported required function syntax: `$funcpart`"))
             end
@@ -318,6 +318,7 @@ function check_interface_implemented(interface::Type, implementor::Type)
     failures = Tuple{Any, Tuple}[]
     for sig in sigs
         func, interfacetypes = sig
+        funcarg = func isa Type ? implementor : func
         argtypes = ntuple(length(interfacetypes)) do i
             itype = interfacetypes[i]
             if interface <: itype 
@@ -329,9 +330,9 @@ function check_interface_implemented(interface::Type, implementor::Type)
             end
         end
         matches = if func isa Type
-            instancemethods(func, argtypes)
+            instancemethods(funcarg, argtypes)
         else
-            Base.methods(func, argtypes)
+            Base.methods(funcarg, argtypes)
         end
         if length(matches) != 1
             found = map(matches) do m
@@ -347,7 +348,12 @@ function check_interface_implemented(interface::Type, implementor::Type)
             push!(failures, (func, argtypes))
             continue
         end
-        ct, rettype = only(code_typed(func, argtypes))
+        if func isa Type
+            mt = Base.code_typed_by_type(Base.to_tuple_type((funcarg, argtypes...)))
+        else
+            mt = code_typed(func, argtypes)
+        end
+        ct, rettype = only(mt)
         rettype !== Union{} && continue # if it infers, we can't throw our error
         isempty(ct.code) && continue # empty function
         offset = ct.code[1] isa Expr && ct.code[1].head === :code_coverage_effect

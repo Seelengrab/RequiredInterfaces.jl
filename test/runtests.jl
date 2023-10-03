@@ -59,6 +59,11 @@ module LinArrayMod
     abstract type LinearArray{T,N} <: AbstractArray{T,N} end
 end
 
+module CallableMod
+    using RequiredInterfaces
+    abstract type CallableAbstract end
+end
+
 const interfaces = (
     ("Basic",                        TestInterface,     TestImpl,          [testfunc],                [(Int, TestInterface)]),
     ("Parametric",                   TestParametric,    ParametricImpl,    [paramfunc],               [(TestParametric,)]),
@@ -136,10 +141,28 @@ const interfaces = (
                 Base.getindex(::LinearArray, ::Int)
             end
         end
-    meths = RI.methods(RI.getInterface(LinArrayMod.LinearArray))
+        meths = RI.methods(RI.getInterface(LinArrayMod.LinearArray))
         @test meths isa Vector{Tuple{Any,Tuple}}
-        @test (:size, (LinArrayMod.LinearArray,)) in meths
-        @test (:getindex, (LinArrayMod.LinearArray,Int)) in meths
+        @test (Base.size, (LinArrayMod.LinearArray,)) in meths
+        @test (Base.getindex, (LinArrayMod.LinearArray,Int)) in meths
         @test length(meths) == 2
+    end
+
+
+    @testset "Callable as interface" begin
+        @eval CallableMod begin
+            @required CallableAbstract begin
+                (c::CallableAbstract)()
+            end
+            struct CallableViolator <: CallableAbstract end
+            struct CallableImpl <: CallableAbstract end
+            (::CallableImpl)() = "implemented"
+        end
+        @test RI.check_interface_implemented(CallableMod.CallableAbstract, CallableMod.CallableImpl)
+        intr = RI.check_interface_implemented(CallableMod.CallableAbstract, CallableMod.CallableViolator)
+        @test intr isa Vector{Tuple{Any, Tuple}}
+        func, sig = only(intr)
+        @test func === CallableMod.CallableAbstract
+        @test sig == ()
     end
 end
