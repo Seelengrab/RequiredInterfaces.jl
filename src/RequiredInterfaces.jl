@@ -247,7 +247,7 @@ julia> bar(Baz(), 1)
 ERROR: NotImplementedError: The called method is part of a fallback definition for the `Foo` interface.
 Please implement `bar(::T, ::Int)` for your type `T <: Foo`.
 Stacktrace:
- [1] bar(#unused#::Baz, #unused#::Int64)
+ [1] bar(::Baz, ::Int64)
    @ Main ./none:1
  [2] top-level scope
    @ none:1
