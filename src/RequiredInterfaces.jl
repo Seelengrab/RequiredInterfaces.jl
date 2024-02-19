@@ -322,7 +322,9 @@ function check_interface_implemented(interface::Type, implementor::Type)
         argtypes = ntuple(length(interfacetypes)) do i
             itype = interfacetypes[i]
             if interface <: itype 
-                implementor 
+                implementor
+            elseif itype isa UnionAll
+                itype
             elseif itype isa Type && itype.name == Base.typename(Type)
                 Type{implementor}
             else

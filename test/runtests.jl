@@ -33,6 +33,13 @@ struct SubNoFallbackImpl{T} <: TestSubNoFallback{T} end
 nofallback(::SubNoFallbackImpl{T}) where T = T
 paramfunc(::SubNoFallbackImpl{T}) where T = T
 
+abstract type TestReqParametric{T} end
+abstract type TestNonReqParametric{T} end
+@required TestReqParametric reqparam(::TestReqParametric, ::TestNonReqParametric)
+
+struct ReqParametricImpl{T} <: TestReqParametric{T} end
+reqparam(::ReqParametricImpl, ::TestNonReqParametric) = true
+
 abstract type TestMultiFunc end
 @required TestMultiFunc begin
     multifunc1(::TestMultiFunc)
@@ -70,7 +77,8 @@ const interfaces = (
     ("TestParametric+SubParametric", TestParametric,    SubParametricImpl, [paramfunc],               [(TestParametric,)]),
     ("SubParametric",                TestSubParametric, SubParametricImpl, [subparamfunc, paramfunc], [(TestSubParametric,), (TestParametric,)]),
     ("MultiFunc",                    TestMultiFunc,     SubMultiFuncImpl,  [multifunc1, multifunc2],  [(TestMultiFunc,), (TestMultiFunc,)]),
-    ("NoFallback",                   TestSubNoFallback, SubNoFallbackImpl, [nofallback, paramfunc],   [(TestSubNoFallback,), (TestParametric,)])
+    ("NoFallback",                   TestSubNoFallback, SubNoFallbackImpl, [nofallback, paramfunc],   [(TestSubNoFallback,), (TestParametric,)]),
+    ("ReqNonReqParametric",          TestReqParametric, ReqParametricImpl, [reqparam],                [(TestReqParametric, TestNonReqParametric),])
 )
 
 @testset "All tests" begin
