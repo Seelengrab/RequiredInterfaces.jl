@@ -337,6 +337,16 @@ function check_interface_implemented(interface::Type, implementor::Type)
             Base.methods(funcarg, argtypes)
         end
         if length(matches) != 1
+            # we could still have a fallback with some more specialized sigs!
+            any(matches) do m
+                fT = if func isa Type
+                    func
+                else
+                    typeof(func)
+                end
+                Tuple{fT, argtypes...} <: m.sig
+            end && continue
+
             found = map(matches) do m
                 typs = if m.sig isa DataType
                     m.sig.types

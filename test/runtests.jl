@@ -50,6 +50,13 @@ struct SubMultiFuncImpl <: TestMultiFunc end
 multifunc1(::SubMultiFuncImpl) = 1
 multifunc2(::SubMultiFuncImpl) = 2
 
+abstract type TestSpecializedWithFallback{T} end
+@required TestSpecializedWithFallback specialFallback(::TestSpecializedWithFallback)
+
+struct SpecializedWithFallbackImpl{T} <: TestSpecializedWithFallback{T} end
+specialFallback(::SpecializedWithFallbackImpl) = "fallback"
+specialFallback(::SpecializedWithFallbackImpl{<:Int}) = "int"
+
 module DRMod
     using RequiredInterfaces
     abstract type DoubleRequired end
@@ -78,7 +85,8 @@ const interfaces = (
     ("SubParametric",                TestSubParametric, SubParametricImpl, [subparamfunc, paramfunc], [(TestSubParametric,), (TestParametric,)]),
     ("MultiFunc",                    TestMultiFunc,     SubMultiFuncImpl,  [multifunc1, multifunc2],  [(TestMultiFunc,), (TestMultiFunc,)]),
     ("NoFallback",                   TestSubNoFallback, SubNoFallbackImpl, [nofallback, paramfunc],   [(TestSubNoFallback,), (TestParametric,)]),
-    ("ReqNonReqParametric",          TestReqParametric, ReqParametricImpl, [reqparam],                [(TestReqParametric, TestNonReqParametric),])
+    ("ReqNonReqParametric",          TestReqParametric, ReqParametricImpl, [reqparam],                [(TestReqParametric, TestNonReqParametric),]),
+    ("SpecializedWithFallback",      TestSpecializedWithFallback, SpecializedWithFallbackImpl, [specialFallback],[(TestSpecializedWithFallback,),])
 )
 
 @testset "All tests" begin
