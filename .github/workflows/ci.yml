@@ -11,6 +11,8 @@ on:
       - main
       - 'feat/**'
     tags: '*'
+  schedule: 
+    - cron: '* * 4 * *'
 
 jobs:
   test:
