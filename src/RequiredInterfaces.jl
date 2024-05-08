@@ -40,6 +40,7 @@ mark fallback implementations as part of a user-implementable interface. Its sol
 parts of an API that a user needs to implement to be able to have functions expecting that interface work.
 """
 macro required(T::Symbol, expr::Expr)
+    expr = macroexpand(__module__, expr)
     escT = esc(T)
     abstrType = getproperty(__module__, T)
     isabstracttype(abstrType) || throw(ArgumentError("Given `$T` is not an abstract type!"))
@@ -84,10 +85,16 @@ macro required(T::Symbol, expr::Expr)
             s = sig[i]
             if s isa Symbol
                 getproperty(__module__, sig[i])
-            elseif s isa Expr && s.head == :curly && length(s.args) == 2 &&  first(s.args) == :Type
-                Type{getproperty(__module__, last(s.args))}
+            elseif s isa Expr && s.head == :curly && length(s.args) == 2 
+                if first(s.args) == :Type
+                    Type{getproperty(__module__, last(s.args))}
+                elseif first(s.args) isa GlobalRef && first(s.args).mod == Base.Multimedia
+                    Base.Multimedia.MIME{last(s.args).value}
+                else
+                    throw(ArgumentError("Invalid curly argument `$s` in required function `$msg`"))
+                end
             else
-                throw(ArgumentError("Invalid required function!"))
+                throw(ArgumentError("Invalid required function: $msg"))
             end
         end
         push!(arr.args, :(($escFunc, $res)))

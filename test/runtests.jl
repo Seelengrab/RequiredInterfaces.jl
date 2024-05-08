@@ -78,6 +78,11 @@ module CallableMod
     abstract type CallableAbstract end
 end
 
+module MIMEMod
+    using RequiredInterfaces
+    abstract type MIMEAbstract end
+end
+
 const interfaces = (
     ("Basic",                        TestInterface,     TestImpl,          [testfunc],                [(Int, TestInterface)]),
     ("Parametric",                   TestParametric,    ParametricImpl,    [paramfunc],               [(TestParametric,)]),
@@ -180,5 +185,27 @@ const interfaces = (
         func, sig = only(intr)
         @test func === CallableMod.CallableAbstract
         @test sig == ()
+    end
+
+    @testset "MIME type macro in `show`" begin
+        @eval MIMEMod begin
+            @required MIMEAbstract Base.show(::IO, ::MIME"text/plain", ::MIMEAbstract)
+            struct MIMEImpl <: MIMEAbstract end
+            struct MIMEViolator <: MIMEAbstract end
+            struct MIMEWrongMIME <: MIMEAbstract end
+            Base.show(io::IO, ::MIME"text/plain", ::MIMEImpl) = print(io, "implemented!")
+            Base.show(io::IO, ::MIME"text/html", ::MIMEWrongMIME) = print(io, "wrong MIME type!")
+        end
+        @test RI.check_interface_implemented(MIMEMod.MIMEAbstract, MIMEMod.MIMEImpl)
+        intr = RI.check_interface_implemented(MIMEMod.MIMEAbstract, MIMEMod.MIMEViolator)
+        @test intr isa Vector{Tuple{Any, Tuple}}
+        func, sig = only(intr)
+        @test func === Base.show
+        @test sig == (IO, MIME"text/plain", MIMEMod.MIMEViolator)
+        intr = RI.check_interface_implemented(MIMEMod.MIMEAbstract, MIMEMod.MIMEWrongMIME)
+        @test intr isa Vector{Tuple{Any, Tuple}}
+        func, sig = only(intr)
+        @test func === Base.show
+        @test sig == (IO, MIME"text/plain", MIMEMod.MIMEWrongMIME)
     end
 end
