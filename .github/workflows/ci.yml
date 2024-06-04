@@ -12,7 +12,7 @@ on:
       - 'feat/**'
     tags: '*'
   schedule: 
-    - cron: '* * 4 * *'
+    - cron: '0 2 4 * *'
 
 jobs:
   test:

@@ -14,7 +14,7 @@ on:
       - 'feat/**'
     tags: '*'
   schedule: 
-    - cron: '* * * * 4'
+    - cron: '0 1 * * 4'
 
 jobs:
   test:
