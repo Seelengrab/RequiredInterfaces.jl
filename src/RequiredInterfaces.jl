@@ -381,9 +381,11 @@ function check_interface_implemented(interface::Type, implementor::Type)
         length(ct.code) < (offset + 2) && continue # function with 2 expr not from us
         errorExpr = ct.code[offset + 2]
         errorExpr isa Expr || continue # not our Error? could be a change in IR
-        errorExpr.head === :call || continue
+        if !(errorExpr.head === :call || errorExpr.head === :new)
+            continue
+        end
         isempty(errorExpr.args) && continue # weird Expr?
-        gr =  errorExpr.args[1]
+        gr = errorExpr.args[1]
         if gr isa GlobalRef && valid_globalref(gr)
             push!(failures, (func, argtypes)) # found one!
         end
