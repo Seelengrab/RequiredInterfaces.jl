@@ -80,7 +80,7 @@ macro required(T::Symbol, expr::Expr)
         msg = error_msg(funcpart, sig)
         escFunc = esc(funcpart)
         e.args[1] = esc(e.args[1])
-        push!(e.args[2].args, :(throw(NotImplementedError(string($escT), $msg))))
+        e.args[2] = :(throw(NotImplementedError(string($escT), $msg)))
         res = ntuple(length(sig)) do i
             s = sig[i]
             if s isa Symbol
@@ -375,9 +375,9 @@ function check_interface_implemented(interface::Type, implementor::Type)
         ct, rettype = only(mt)
         rettype !== Union{} && continue # if it infers, we can't throw our error
         isempty(ct.code) && continue # empty function
-        offset = ct.code[1] isa Expr && ct.code[1].head === :code_coverage_effect
-        length(ct.code) < 2 && continue # function with only one expr - not our code
-        offset += ct.code[2] isa Expr && ct.code[2].head === :code_coverage_effect
+        offset::Int = ct.code[2] isa Expr && ct.code[2].head === :code_coverage_effect
+        length(ct.code) < 3 && continue # function with only one expr - not our code
+        offset += ct.code[3] isa Expr && ct.code[3].head === :code_coverage_effect
         length(ct.code) < (offset + 2) && continue # function with 2 expr not from us
         errorExpr = ct.code[offset + 2]
         errorExpr isa Expr || continue # not our Error? could be a change in IR
