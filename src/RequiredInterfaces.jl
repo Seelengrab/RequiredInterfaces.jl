@@ -261,6 +261,8 @@ Stacktrace:
 
 julia> bar(1, Baz())
 ERROR: MethodError: no method matching bar(::Int64, ::Baz)
+The function `bar` exists, but no method is defined for this combination of argument types.
+
 Stacktrace:
  [1] top-level scope
    @ none:1
