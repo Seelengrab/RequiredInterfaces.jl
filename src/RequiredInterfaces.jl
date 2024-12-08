@@ -263,6 +263,10 @@ julia> bar(1, Baz())
 ERROR: MethodError: no method matching bar(::Int64, ::Baz)
 The function `bar` exists, but no method is defined for this combination of argument types.
 
+Closest candidates are:
+  bar(!Matched::Foo, !Matched::Int64)
+   @ Main none:1
+
 Stacktrace:
  [1] top-level scope
    @ none:1
