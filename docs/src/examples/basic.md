@@ -38,9 +38,9 @@ to (at least partially) automate this. What's worse, with just the bare `functio
 it's impossible to tell "this is unsupported" apart from "this is intended to be implemented".
 
 This is where RequiredInterfaces.jl comes in. If the above module makes use of [`@required`](@ref) to mark
-its interface requirementsi in terms of required dispatches, downstream packages that want to implement the interface
+its interface requirements in terms of required dispatches, downstream packages that want to implement the interface
 can preemptively check if they've even defined the correct methods (and not have their implementation work by
-accident in an unsupported manner, e.g. by comitting type piracy or implementing an entirely different set of methods
+accident in an unsupported manner, e.g. by committing type piracy or implementing an entirely different set of methods
 that just happen to work).
 
 The change `A` has to make is simple:
@@ -80,7 +80,7 @@ A.myfunc(Foo())
 ```
 
 This is because [`@required`](@ref) defines a fallback method that dispatches to [`NotImplementedError`](@ref),
-allowing users that encounter this error to notify the package maintainter that they have missed to implement a required
+allowing users that encounter this error to notify the package maintainer that they have missed to implement a required
 method. Further, because this is an actually thrown error, it's also discoverable through JET.jl, even without
 explicit interface testing by implementors.
 

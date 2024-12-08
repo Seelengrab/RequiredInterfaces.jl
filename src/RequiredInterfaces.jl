@@ -30,7 +30,7 @@ function getInterface end
         bar(::A, ::MyInterface)
     end
 
-Marks all occurences of `MyInterface` in the given function signatures as part of the interface `MyInterface`.
+Marks all occurrences of `MyInterface` in the given function signatures as part of the interface `MyInterface`.
 Also defines fallback methods, which throw a [`NotImplementedError`](@ref) when called with an argument that
 doesn't implement this mandatory function.
 
@@ -301,7 +301,7 @@ function nonabstract_subtypes(T=Any)
 end
 
 function interface_supertypes(T::Type)
-    (T isa Union || T === Union{}) && throw(ArgumentError("Can't get interface superttypes of a union: `$T`"))
+    (T isa Union || T === Union{}) && throw(ArgumentError("Can't get interface supertypes of a union: `$T`"))
     interface_supertypes!(Type[], T)
 end
 

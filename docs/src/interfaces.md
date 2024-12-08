@@ -46,21 +46,21 @@ This lattice has the following properties. The first five properties follow dire
     * All types are their own subtype.
  * For all types `T`, if `isconcretetype(T)` is `true`, then the only types `S` for which `S <: T` is `true` are `S === Union{}` and `S === T`.
     * This is the requirement that concrete types cannot be subtyped; they are (almost) direct supertypes of `Union{}`, though `supertypes(Union{})` can't show us that (the set is not enumerable, because it grows with new struct & type definitions and `UnionAll`s make a mess of things through virtue of being infinitely large).
-    * Note that if `!isconcretetype(T)`, this property has no effect - we can add a new abstract type below an existing abstract type, effectively inserting it inbetween `Union{} <: T` like `Union{} <: S <: T`.
+    * Note that if `!isconcretetype(T)`, this property has no effect - we can add a new abstract type below an existing abstract type, effectively inserting it in-between `Union{} <: T` like `Union{} <: S <: T`.
 
 There are some other properties the type lattice has, but these are the ones relevant for this discussion,
 so we'll leave it at that. An informal description of the lattice is "I can do potentially everything with an
-`Any`", "I can do nothing at all with a `Union{}`" and "I can do *something* with any type inbetween". 
+`Any`", "I can do nothing at all with a `Union{}`" and "I can do *something* with any type in-between". 
 
 Stated differently, we can expect nothing in particular of an `Any`, we can expect **exactly** that we can't do
-anything with a `Union{}` and we can expect *something* of any type inbetween.
+anything with a `Union{}` and we can expect *something* of any type in-between.
 
 Stated yet differently, we don't get any guarantees from an object whose type we only know as `Any`, we get
 **exactly** the guarantee that we can do nothing from an object whose type we only know as `Union{}`, and we
-can expect *some* guarantees from objects whose type lies inbetween `Any` and `Union{}`.
+can expect *some* guarantees from objects whose type lies in between `Any` and `Union{}`.
 
 And stated yet differently, we can say that objects of type `Any` are minimally restrictive (they can do anything), objects of type
-`Union{}` are maximally restrictive (they can do nothing), and objects inbetween have *some* restriction.
+`Union{}` are maximally restrictive (they can do nothing), and objects in-between have *some* restriction.
 
 What we're interested in here is that *something*, and how it relates to the notion of an interface. For these purposes,
 `UnionAll`s behave exactly like abstract types (though with some additional features), so we're going to treat them as one entity.
@@ -221,7 +221,7 @@ pushpend!(a::Vector{UInt8}) = push!(a, UInt8('!'))
 
 ## Multiple Abstract Subtyping
 
-Anyone cursorly familiar with abstract types and interfaces in Julia is going to come across the issue of
+Anyone cursorily familiar with abstract types and interfaces in Julia is going to come across the issue of
 wanting to implement more than one interface, and being able to communicate to others that they have done so.
 Most commonly, this comes up when implementing the `AbstractArray` interface, as well as the iteration
 interface - most types that wish to be treated like an `AbstractArray` are also iterable in one form or another.
@@ -321,8 +321,8 @@ able to say that we can have types that declare a subtype relationship with more
 effectively saying that we fulfill the requirements of more than one abstract type. This isn't currently possible in Julia,
 but let's imagine it is and think about the consequences of what we might want to do.
 
-Importantly, before we do - none of this means that these requirements & guaraantees are machine checkable or formally verified.
-Everything so far works just as well with "lazy" or only seperate checking of those requirements as it does with
+Importantly, before we do - none of this means that these requirements & guarantees are machine checkable or formally verified.
+Everything so far works just as well with "lazy" or only separate checking of those requirements as it does with
 SAT based checking.
 
 Without further ado, here's the `MyTrait` and `AnotherTrait` example from above. In order to facilitate multiple
@@ -360,12 +360,12 @@ must still be conformed to.
 
 Similarly to the interpretation of `Meet` in structs, writing something like `abstract type Foo <: Meet{Bar,Baz} end`
 can be interpreted as "subtypes of `Foo` need to implement/conform to both the `Bar` and `Baz` interfaces, as well as
-any additional guaraantees/requirements of `Foo`, if there are any".
+any additional guarantees/requirements of `Foo`, if there are any".
 
 Now, this isn't to say there aren't issues with `Meet` - for one, it doesn't allow third parties to extend
 the supported interfaces of `Foo`, because which interfaces `Foo` implements is part of its type definition.
 This is not an issue with Holy traits, due to their trait opt-in being disconnected from subtyping. This
-is the flipside of creating traits through dispatch, instead of through subtyping. However, how often this
+is the flip-side of creating traits through dispatch, instead of through subtyping. However, how often this
 is actually needed/a good idea in practice is questionable - after all, since this is just regular dispatch,
 it's perfectly possible to just implement an interface on `Foo` directly, without explicitly subtyping the interface
 type. The only issue is that this doesn't scale all too well, due to the fact that third party code then too
@@ -424,7 +424,7 @@ which implementation of `_myInterfaceFunc` we'd like to use, if both exist. The 
 
 In contrast, since both `MyTrait` and `AnotherTrait` share this trait function as part of their interface, `Foo` ought to have already been aware
 of the  ambiguity, and implemented to specialized version `myInterfaceFunc(::Foo)` itself directly (or fallen back to `myInterfaceFunc(::Meet{MyTrait, AnotherTrait})`,
-should that be available). The aambiguity needs to be broken some way or another, either by the `Foo` type for itself (it can't define the `Meet` version without piracy)
+should that be available). The ambiguity needs to be broken some way or another, either by the `Foo` type for itself (it can't define the `Meet` version without piracy)
 or by either `MyTrait` or `AnotherTrait` via a package extension (ideally in coordinate, as otherwise you may get conflicting definitions overwriting each other).
 
 All of this will need to be discussed & thought through thoroughly though - there is no silver bullet.
@@ -464,7 +464,7 @@ An attempt at that exhaustiveness specific to Julia was recorded [here](https://
 though there certainly is room for improvement and a more thorough calculus on what is permitted in terms of
 a change in API. There is also the possibility of incorporating existing literature into this (most I could find
 was in regards to empirical studies of API stability in Java, but even those results are bound to be useful). There
-is also some existing work from the rust community aabout this - see the references list down below.
+is also some existing work from the rust community about this - see the references list down below.
 
 Finally, the large body of work on preconditions, postconditions & invariants is also related to this topic.
 
