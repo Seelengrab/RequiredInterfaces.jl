@@ -1,7 +1,7 @@
 name = "RequiredInterfaces"
 uuid = "97f35ef4-7bc5-4ec1-a41a-dcc69c7308c6"
 authors = ["Sukera <Seelengrab@users.noreply.github.com>"]
-version = "0.1.6"
+version = "0.1.7"
 
 [deps]
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -9,4 +9,4 @@ Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-julia = "1.6"
+julia = "1.9"
