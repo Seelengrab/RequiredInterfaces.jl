@@ -1,3 +1,10 @@
+import Pkg
+
+cd(@__DIR__)
+Pkg.activate(@__DIR__)
+Pkg.develop(path="..")
+Pkg.instantiate()
+
 liveserver = "liveserver" in ARGS
 if liveserver
     using Revise
@@ -16,6 +23,7 @@ function builddocs(clear=false)
         format = Documenter.HTML(
             prettyurls = get(ENV, "CI", nothing) == true
         ),
+        repo=Remotes.GitHub("Seelengrab", "RequiredInterfaces.jl"),
         pages = [
             "Main Page" => "index.md",
             "Examples" => [
